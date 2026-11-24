@@ -524,6 +524,7 @@
         ${allergyNote(S.getProfile(other.id) || {}, other.name + '님')}
         <div class="messages" id="messages">${bubbles}</div>
         ${composer}
+        ${dutchPay({ people: 2, chatId: S.canChat(r) ? id : '' })}
         <p class="note">연락처는 밥약이 수락되면 공개돼요. 그 전에는 여기서 편하게 이야기하세요.</p>
       </section>`;
   }
@@ -542,6 +543,42 @@
         <select name="aend" aria-label="끝 시각">${hours(S.HOUR_MIN + S.MIN_RANGE, S.HOUR_MAX, a.end)}</select>
         <button type="button" class="link-btn remove" data-action="remove-range" aria-label="이 시간 삭제">✕</button>
       </div>`;
+  }
+
+  // ---------- 더치페이(엔빵) 계산기 ----------
+  // 1인당 금액은 10원 단위로 올림. 실제 송금은 하지 않고, 송금처 메모만 함께 공유
+  const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
+  function splitBill(total, people) {
+    if (!(total > 0) || !(people >= 2)) return null;
+    const each = Math.ceil(total / people / 10) * 10;
+    return { each, extra: each * people - total };
+  }
+  const dutchText = (total, people, memo) => {
+    const s = splitBill(total, people);
+    if (!s) return '';
+    return `🧾 엔빵: 총 ${won(total)} ÷ ${people}명 = 1인 ${won(s.each)}${s.extra ? ` (올림 때문에 ${won(s.extra)} 남아요)` : ''}${memo ? ` · 송금처: ${memo}` : ''}`;
+  };
+  function dutchPay({ people, chatId }) {
+    return `
+      <details class="dutch">
+        <summary>🧾 엔빵 계산기</summary>
+        <div class="dutch-body" data-chat="${esc(chatId)}">
+          <div class="inline two">
+            <label>총 금액 (원)<input type="number" name="dutchTotal" min="0" step="100" inputmode="numeric" placeholder="예: 23000"></label>
+            <label>인원<input type="number" name="dutchPeople" min="2" max="20" value="${people}" inputmode="numeric"></label>
+          </div>
+          <label>송금처 메모 <span class="sub">(선택)</span><input name="dutchMemo" maxlength="40" placeholder="예: 카카오페이로 보내주세요"></label>
+          <p class="dutch-result note">금액을 입력하면 1인당 금액을 계산해요.</p>
+          ${chatId ? '<button type="button" class="btn small" data-action="send-dutch">대화방에 보내기</button>' : ''}
+        </div>
+      </details>`;
+  }
+  function readDutch(box) {
+    return {
+      total: Number(box.querySelector('[name=dutchTotal]').value),
+      people: Number(box.querySelector('[name=dutchPeople]').value),
+      memo: box.querySelector('[name=dutchMemo]').value.trim(),
+    };
   }
 
   // ---------- 밥친구 모집 · 그룹 밥약 ----------
@@ -616,6 +653,7 @@
         <ul class="members">${members}</ul>
         ${joined ? '' : '<p class="note">참여하면 멤버들의 연락처를 볼 수 있어요.</p>'}
         <div style="margin-top:12px">${action}</div>
+        ${joined ? dutchPay({ people: m.memberIds.length, chatId: '' }) : ''}
       </article>`;
   }
 
@@ -973,6 +1011,14 @@
     slot.innerHTML = slotOptions(requestForm.profile, day.disabled ? '' : day.value);
   });
 
+  // 엔빵 계산기: 입력할 때마다 결과 갱신
+  document.addEventListener('input', (e) => {
+    const box = e.target.closest('.dutch-body');
+    if (!box) return;
+    const { total, people, memo } = readDutch(box);
+    box.querySelector('.dutch-result').textContent = dutchText(total, people, memo) || '총 금액과 2명 이상 인원을 입력해 주세요.';
+  });
+
   document.addEventListener('input', (e) => {
     const map = { 'f-q': 'q', 'f-dept': 'dept', 'f-day': 'day', 'f-slot': 'slot' };
     if (map[e.target.id]) {
@@ -985,6 +1031,15 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    if (action === 'send-dutch') {
+      const box = el.closest('.dutch-body');
+      const { total, people, memo } = readDutch(box);
+      const text = dutchText(total, people, memo);
+      if (!text) return toast('총 금액과 2명 이상 인원을 입력해 주세요.');
+      const err = S.sendMessage(box.dataset.chat, text);
+      toast(err || '엔빵 결과를 대화방에 보냈어요.');
+      return route();
+    }
     if (action === 'join-meetup') {
       if (!S.currentUser()) return go('#/login?next=' + encodeURIComponent('#/meetup/' + id));
       const err = S.joinMeetup(id);

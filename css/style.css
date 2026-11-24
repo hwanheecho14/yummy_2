@@ -632,3 +632,10 @@ blockquote {
 .avatar.seat { background: var(--chip); color: var(--muted); font-size: 0.9rem; }
 .members { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 10px; }
 .member { display: flex; gap: 10px; align-items: flex-start; }
+
+/* ---------- 엔빵 계산기 ---------- */
+.dutch { border: 1.5px dashed var(--line); border-radius: var(--radius-sm); padding: 10px 14px; margin-top: 12px; }
+.dutch summary { cursor: pointer; font-weight: 700; color: var(--primary-deep); }
+.dutch-body { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.dutch-result { font-weight: 600; color: var(--text); }
+.dutch-body .btn { align-self: flex-start; }
