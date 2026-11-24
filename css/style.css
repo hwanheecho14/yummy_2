@@ -1,45 +1,30 @@
+/* 밝은 테마 하나만 사용합니다 (기기 다크 모드와 상관없이 항상 밝게) */
 :root {
-  --bg: #faf7f2;
+  color-scheme: light;
+  --bg: #fffaf3;
   --surface: #ffffff;
   --text: #2b2522;
   --muted: #7a706a;
-  --line: #e9e2d9;
-  --primary: #e8642c;
+  --line: #f0e6da;
+  --primary: #f26b2e;
   --primary-ink: #ffffff;
-  --primary-soft: #fdebe2;
+  --primary-soft: #ffeee4;
+  --accent: #ffc93c;
+  --accent-soft: #fff5d6;
   --good: #2f8a4f;
-  --good-soft: #e3f3e8;
-  --bad: #b8443c;
-  --bad-soft: #f8e4e2;
-  --chip: #f3ede5;
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(60, 40, 20, 0.06), 0 4px 14px rgba(60, 40, 20, 0.05);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1816;
-    --surface: #26221f;
-    --text: #f1ebe5;
-    --muted: #a99f97;
-    --line: #3a3430;
-    --primary: #f07a45;
-    --primary-ink: #1b1816;
-    --primary-soft: #3e2a20;
-    --good: #6cc68b;
-    --good-soft: #1f3326;
-    --bad: #ee8a82;
-    --bad-soft: #3b2422;
-    --chip: #342e2a;
-    --shadow: none;
-  }
+  --good-soft: #e5f6ea;
+  --bad: #c04a40;
+  --bad-soft: #fdeceb;
+  --chip: #fbf3ea;
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(120, 70, 20, 0.05), 0 6px 18px rgba(120, 70, 20, 0.07);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, #fff3e6 0, var(--bg) 320px);
   color: var(--text);
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-size: 16px;
@@ -56,7 +41,8 @@ h2 { font-size: 1.15rem; margin: 0 0 8px; }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
 .topbar-inner {
@@ -114,7 +100,12 @@ h2 { font-size: 1.15rem; margin: 0 0 8px; }
   margin-bottom: 16px;
 }
 
-.hero { padding: 8px 0 16px; }
+.hero {
+  padding: 24px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #ffe3cf, #fff4d9);
+}
 .hero p { color: var(--muted); margin: 0; }
 .hero-cta { margin-top: 12px !important; }
 
