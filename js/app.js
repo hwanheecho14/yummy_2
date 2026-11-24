@@ -990,7 +990,7 @@
         <p class="sub">한 브라우저에서 계정을 바꿔 가며 신청 → 수락 흐름을 확인할 수 있어요.</p>
         <div class="inline wrap">
           <button class="btn ghost" type="button" data-action="demo" data-id="u_j1" data-next="${esc(next)}">후배로 체험 (박정환, 26학번 새내기)</button>
-          <button class="btn ghost" type="button" data-action="demo" data-id="u_s1" data-next="${esc(next)}">선배로 체험 (김민준, 20학번)</button>
+          <button class="btn ghost" type="button" data-action="demo" data-id="u_s1" data-next="${esc(next)}">선배로 체험 (김민준, 23학번)</button>
         </div>
       </section>`;
   }
