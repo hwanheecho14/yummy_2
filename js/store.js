@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v12';
-  const DB_VERSION = 12;
+  const KEY = 'bapyak-db-v13';
+  const DB_VERSION = 13;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -204,6 +204,17 @@
       buddy('u_j2', '혼밥 탈출하고 싶어요. 경영 수업 끝나고 저녁 같이 먹을 친구 구해요!', ['화', '목'], ['dinner'], ['파스타', '김밥']),
       buddy('u_b2', '공강에 새로운 맛집 찾아다니는 걸 좋아해요. 다른 과 친구도 환영!', ['수', '금'], ['lunch'], ['쌀국수', '초밥'])
     );
+    // 후배 체험 계정(박정환)은 목록에 공개하지 않은 시간표만 등록해 둠 → 선배 화면에서 '겹치는 공강'을 바로 볼 수 있음
+    profiles.push({
+      userId: 'u_j1', kind: 'buddy', bio: '', avail: [], isPublic: false, foods: ['마라탕', '돈까스'], spots: [], allergies: [],
+      timetable: {
+        classes: [
+          { day: '월', start: 9, end: 12 }, { day: '화', start: 13, end: 17 }, { day: '수', start: 9, end: 11 },
+          { day: '목', start: 10, end: 13 }, { day: '금', start: 9, end: 11 },
+        ],
+        image: null,
+      },
+    });
     const requests = [
       {
         id: 'r_seed1', fromId: 'u_j2', toId: 'u_s1',
@@ -412,6 +423,55 @@
     save();
   }
 
+  // ---------- 겹치는 공강 계산 ----------
+  // 내 가능 시간(없으면 시간표의 공강)과 상대 가능 시간이 2시간 이상 겹치는 구간
+  function myFreeTime(userId) {
+    const p = getProfile(userId);
+    if (!p) return [];
+    if ((p.avail || []).length) return mergeRanges(p.avail);
+    if (p.timetable && (p.timetable.classes || []).length) return freeRanges(p.timetable.classes);
+    return [];
+  }
+
+  function overlapRanges(a, b) {
+    const out = [];
+    mergeRanges(a).forEach((x) =>
+      mergeRanges(b).forEach((y) => {
+        if (x.day !== y.day) return;
+        const start = Math.max(x.start, y.start);
+        const end = Math.min(x.end, y.end);
+        if (end - start >= MIN_RANGE) out.push({ day: x.day, start, end });
+      })
+    );
+    return mergeRanges(out);
+  }
+
+  // 상대와 얼마나 잘 맞는지: 겹치는 공강 시간(시간 단위)과 같이 좋아하는 메뉴
+  function matchWith(userId, otherProfile) {
+    const overlap = overlapRanges(myFreeTime(userId), otherProfile.avail || []);
+    const myFoods = (getProfile(userId) || {}).foods || [];
+    const sharedFoods = (otherProfile.foods || []).filter((f) => myFoods.includes(f));
+    const hours = overlap.reduce((sum, r) => sum + (r.end - r.start), 0);
+    return { overlap, hours, sharedFoods, score: hours + sharedFoods.length * 2 };
+  }
+
+  // 앞으로 4주 안에서 겹치는 공강에 맞는 추천 일시 (날짜가 다른 n개, 수요일 공강 이벤트 시간 우선)
+  function recommendTimes(userId, otherProfile, n = 3) {
+    const overlap = matchWith(userId, otherProfile).overlap;
+    const out = [];
+    const d = new Date(today() + 'T00:00:00');
+    for (let i = 1; i <= 28 && out.length < n; i++) {
+      d.setDate(d.getDate() + 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const ranges = overlap.filter((r) => r.day === weekday(iso));
+      if (!ranges.length) continue;
+      const starts = ranges.flatMap((r) => Array.from({ length: r.end - r.start - 1 }, (_, k) => r.start + k));
+      const pick = starts.includes(13) && weekday(iso) === '수' ? 13 : starts[0];
+      out.push({ date: iso, slot: 'h' + pick });
+    }
+    return out;
+  }
+
   // ---------- 공개 프로필 목록 ----------
   // kind: 'senior'(선배가 밥약 받기) | 'buddy'(학년 상관없이 같이 밥 먹을 밥친구 찾기)
   const KINDS = { senior: '선배', buddy: '밥친구' };
@@ -590,7 +650,7 @@
   load();
 
   window.Store = {
-    ALLERGENS, BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    myFreeTime, overlapRanges, matchWith, recommendTimes, ALLERGENS, BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
