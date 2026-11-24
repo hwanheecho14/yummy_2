@@ -300,12 +300,12 @@
       }
     }
     if (isPublic && !avail.length) return '공개하려면 가능한 시간을 하나 이상 추가해 주세요.';
+    if (timetable && timetable.image && timetable.image.length > IMAGE_MAX_CHARS) return '시간표 이미지가 너무 커요. 더 작은 이미지를 올려 주세요.';
     let p = getProfile(u.id);
     if (!p) {
       p = { userId: u.id };
       db.profiles.push(p);
     }
-    if (timetable && timetable.image && timetable.image.length > IMAGE_MAX_CHARS) return '시간표 이미지가 너무 커요. 더 작은 이미지를 올려 주세요.';
     const before = JSON.stringify(p);
     Object.assign(p, {
       bio: bio.trim(),
