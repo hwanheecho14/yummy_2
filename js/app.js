@@ -150,6 +150,7 @@
       </section>
       ${eventBanner()}
       ${kindTabs()}
+      ${filters.kind === 'buddy' ? meetupBoard() : ''}
       <section class="filters" aria-label="검색 필터">
         <input type="search" id="f-q" placeholder="이름, 학과, 소개로 검색" value="${esc(filters.q)}" aria-label="검색어">
         <select id="f-dept" aria-label="학과">${opt('', '전체 학과', filters.dept)}${depts.map((d) => opt(d, d, filters.dept)).join('')}</select>
@@ -543,6 +544,112 @@
       </div>`;
   }
 
+  // ---------- 밥친구 모집 · 그룹 밥약 ----------
+  function meetupCard(m) {
+    const me = S.currentUser();
+    const host = S.userById(m.hostId);
+    const joined = me && m.memberIds.includes(me.id);
+    const full = S.isMeetupFull(m);
+    const avatars = m.memberIds.map((id) => S.userById(id)).filter(Boolean).map(initial).join('');
+    const empty = '<div class="avatar seat" aria-hidden="true">＋</div>'.repeat(Math.max(0, m.capacity - m.memberIds.length));
+    const action = joined
+      ? '<span class="badge badge-accepted">참여 중</span>'
+      : full
+        ? '<span class="badge badge-muted">마감</span>'
+        : `<button type="button" class="btn small" data-action="join-meetup" data-id="${esc(m.id)}">참여하기</button>`;
+    return `
+      <article class="card meetup-card">
+        <div class="meetup-top"><span class="chip format">${esc(S.MEETUP_FORMATS[m.format])}</span><span class="sub">${m.memberIds.length}/${m.capacity}명</span></div>
+        <a class="meetup-title" href="#/meetup/${esc(m.id)}">${esc(m.title)}</a>
+        <p class="sub">📅 ${fmtDate(m.date)} ${esc(slotText(m.slot))}${S.isEventOption(m) ? ' ☕' : ''} · 📍 ${esc(m.place)}</p>
+        <p class="sub">주최: ${esc(host ? host.name : '')} (${host ? userLine(host) : ''})</p>
+        <div class="meetup-bottom"><div class="seats">${avatars}${empty}</div>${action}</div>
+      </article>`;
+  }
+
+  function meetupBoard() {
+    const list = S.upcomingMeetups();
+    const me = S.currentUser();
+    return `
+      <section class="senior-section featured meetup-board">
+        <div class="board-head">
+          <div><h2>🔥 밥친구 모집 · 그룹 밥약</h2>
+            <p class="sub">1:1이 부담스러우면 친구랑 같이! 번개 모집이나 2:2·3:3 그룹 밥약에 참여해 보세요.</p></div>
+          <a class="btn small" href="${me ? '#/meetup/new' : '#/login?next=' + encodeURIComponent('#/meetup/new')}">+ 모집글 쓰기</a>
+        </div>
+        ${list.length ? `<div class="grid">${list.map(meetupCard).join('')}</div>` : '<p class="empty">지금 열린 모집이 없어요. 첫 모집글을 써 보세요!</p>'}
+      </section>`;
+  }
+
+  function viewMeetup(id) {
+    const m = S.meetupById(id);
+    const me = S.currentUser();
+    if (!m) return '<div class="card"><p>찾을 수 없는 모집이에요.</p><a class="btn ghost" href="#/">목록으로</a></div>';
+    const joined = me && m.memberIds.includes(me.id);
+    const members = m.memberIds
+      .map((uid2) => S.userById(uid2))
+      .filter(Boolean)
+      .map(
+        (u) => `<li class="member">${initial(u)}<div><strong>${esc(u.name)}</strong>${u.id === m.hostId ? ' <span class="chip">주최</span>' : ''}
+            <div class="sub">${userLine(u)}</div>
+            ${joined ? `<div class="sub">📞 ${esc(u.contact || '연락처 없음')}</div>` : ''}</div></li>`
+      )
+      .join('');
+    let action = '';
+    if (m.cancelled) action = '<p class="note">취소된 모집이에요.</p>';
+    else if (!me) action = `<a class="btn" href="#/login?next=${encodeURIComponent('#/meetup/' + m.id)}">로그인하고 참여하기</a>`;
+    else if (joined)
+      action = `<button type="button" class="btn ghost" data-action="leave-meetup" data-id="${esc(m.id)}">${m.hostId === me.id ? '모집 취소하기' : '참여 취소하기'}</button>`;
+    else if (S.isMeetupFull(m)) action = '<p class="note">자리가 다 찼어요.</p>';
+    else action = `<button type="button" class="btn" data-action="join-meetup" data-id="${esc(m.id)}">참여하기</button>`;
+    return `
+      <a class="back" href="#/">← 목록으로</a>
+      <article class="card">
+        <span class="chip format">${esc(S.MEETUP_FORMATS[m.format])}</span>
+        <h1 style="margin-top:8px">${esc(m.title)}</h1>
+        <dl class="facts">
+          <dt>일시</dt><dd>${fmtDate(m.date)} ${esc(slotText(m.slot))}${S.isEventOption(m) ? ' ☕ 공강 이벤트 시간' : ''}</dd>
+          <dt>장소</dt><dd>${esc(m.place)}</dd>
+          <dt>인원</dt><dd>${m.memberIds.length}/${m.capacity}명</dd>
+        </dl>
+        <h2 style="margin-top:16px">멤버</h2>
+        <ul class="members">${members}</ul>
+        ${joined ? '' : '<p class="note">참여하면 멤버들의 연락처를 볼 수 있어요.</p>'}
+        <div style="margin-top:12px">${action}</div>
+      </article>`;
+  }
+
+  function viewMeetupNew() {
+    if (!S.currentUser()) return '<div class="card"><p>로그인이 필요해요.</p><a class="btn" href="#/login">로그인</a></div>';
+    const dates = [];
+    const d = new Date(S.today() + 'T00:00:00');
+    for (let i = 0; i < 21; i++) {
+      if (S.DAYS.includes(WEEKDAY[d.getDay()])) {
+        dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return `
+      <a class="back" href="#/">← 목록으로</a>
+      <section class="card narrow">
+        <h1>모집글 쓰기</h1>
+        <form data-form="meetup" class="stack">
+          <label>제목 <span class="sub">(40자 이내)</span><input name="title" maxlength="40" required placeholder="예: 공강에 학식 같이 먹을 사람!"></label>
+          <fieldset><legend>모집 방식</legend><div class="checks">
+            ${Object.entries(S.MEETUP_FORMATS).map(([k, v], i) => `<label class="radio"><input type="radio" name="format" value="${k}" ${i === 0 ? 'checked' : ''}> ${esc(v)}</label>`).join('')}
+          </div></fieldset>
+          <label>인원 (자유 모집일 때) <select name="capacity">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${n === 4 ? 'selected' : ''}>${n}명</option>`).join('')}</select></label>
+          <div class="inline two">
+            <label>날짜<select name="date">${dates.map((iso) => `<option value="${iso}">${fmtDate(iso)}</option>`).join('')}</select></label>
+            <label>시간<select name="slot">${S.SLOTS.map((s) => `<option value="${s.id}" ${s.id === 'h12' ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}</select></label>
+          </div>
+          <label>장소 <span class="sub">(30자 이내)</span><input name="place" maxlength="30" required placeholder="예: 학생식당, 한대앞역 근처"></label>
+          <button class="btn" type="submit">모집 시작하기</button>
+          <p class="note">수요일 13:00~15:00로 모으면 공강 이벤트 시간이에요 ☕</p>
+        </form>
+      </section>`;
+  }
+
   // ---------- 겹치는 공강 ----------
   const rangeText = (r) => `${r.day} ${r.start}:00~${r.end}:00`;
   const matchOf = (profile) => {
@@ -805,6 +912,7 @@
       case 'notifications': html = viewNotifications(); break;
       case 'event': html = viewEvent(); break;
       case 'chat': html = viewChat(parts[1]); active = 'my'; break;
+      case 'meetup': html = parts[1] === 'new' ? viewMeetupNew() : viewMeetup(parts[1]); active = 'list'; break;
       case 'login': html = viewLogin(params); break;
       case 'signup': html = viewSignup(params); active = 'login'; break;
       default: html = '<div class="card"><p>없는 페이지예요.</p><a class="btn ghost" href="#/">홈으로</a></div>';
@@ -877,6 +985,20 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    if (action === 'join-meetup') {
+      if (!S.currentUser()) return go('#/login?next=' + encodeURIComponent('#/meetup/' + id));
+      const err = S.joinMeetup(id);
+      toast(err || '참여했어요! 멤버 연락처를 확인해 보세요.');
+      return err ? route() : go('#/meetup/' + id);
+    }
+    if (action === 'leave-meetup') {
+      const m = S.meetupById(id);
+      const host = m && m.hostId === S.currentUser()?.id;
+      if (!confirm(host ? '모집을 취소할까요? 참여한 멤버에게 알림이 가요.' : '참여를 취소할까요?')) return;
+      const err = S.leaveMeetup(id);
+      toast(err || (host ? '모집을 취소했어요.' : '참여를 취소했어요.'));
+      return route();
+    }
     if (action === 'fill-recommend') {
       // 추천 일시를 희망 일시 1~3번 칸에 차례로 넣음 (월 → 일 → 시간대 순서로 바꿔야 선택지가 채워짐)
       const form = document.querySelector('form[data-form="request"]');
@@ -1015,6 +1137,17 @@
           return go('#/my?tab=sent');
         }
         break;
+      }
+      case 'meetup': {
+        const res = S.createMeetup({
+          title: d.title || '', format: d.format, date: d.date, slot: d.slot, place: d.place || '', capacity: Number(d.capacity),
+        });
+        if (typeof res === 'string') {
+          err = res;
+          break;
+        }
+        toast('모집글을 올렸어요!');
+        return go(`#/meetup/${res.id}`);
       }
       case 'chat':
         err = S.sendMessage(form.dataset.id, d.text || '');
