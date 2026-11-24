@@ -214,6 +214,9 @@
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
           <dt>가능한 시간</dt><dd><div class="chips">${availChips(profile)}</div></dd>
+          ${profile.timetable && profile.timetable.image
+            ? `<dt>시간표</dt><dd><details class="tt-view"><summary>선배 시간표 보기</summary><img src="${esc(profile.timetable.image)}" alt="${esc(user.name)} 선배의 시간표"></details></dd>`
+            : ''}
         </dl>
         ${safety}
       </article>
@@ -487,6 +490,72 @@
       </div>`;
   }
 
+  // ---------- 시간표 올리기 ----------
+  // 수업 칸을 눌러 표시하면 공강 시간을 계산해 '가능한 시간'에 채울 수 있음. 시간표 캡처 이미지도 첨부 가능
+  function timetableEditor(p) {
+    const tt = p.timetable || { classes: [], image: null };
+    const isClass = (day, h) => tt.classes.some((c) => c.day === day && c.start <= h && h < c.end);
+    const hours = Array.from({ length: S.TIMETABLE_END - S.TIMETABLE_START }, (_, i) => S.TIMETABLE_START + i);
+    const grid = `
+      <div class="tt-grid" role="grid" aria-label="주간 시간표">
+        <div class="tt-corner"></div>${S.DAYS.map((d) => `<div class="tt-day">${d}</div>`).join('')}
+        ${hours
+          .map(
+            (h) => `<div class="tt-hour">${h}시</div>${S.DAYS.map(
+              (d) => `<button type="button" class="tt-cell ${isClass(d, h) ? 'on' : ''}" data-action="toggle-cell" data-day="${d}" data-hour="${h}" aria-pressed="${isClass(d, h)}" aria-label="${d} ${h}시 수업"></button>`
+            ).join('')}`
+          )
+          .join('')}
+      </div>`;
+    return `
+      <fieldset class="tt-editor"><legend>내 시간표</legend>
+        <p class="sub">수업이 있는 칸을 눌러 칠해 주세요. 그다음 '공강 시간으로 채우기'를 누르면 아래 가능한 시간이 자동으로 채워져요.</p>
+        ${grid}
+        <div class="inline wrap tt-actions">
+          <button type="button" class="btn ghost small" data-action="fill-free">🍱 공강 시간으로 채우기</button>
+          <button type="button" class="link-btn" data-action="clear-cells">시간표 비우기</button>
+        </div>
+        <div class="tt-image">
+          <label class="file-label">시간표 이미지 첨부 <span class="sub">(에브리타임 캡처 등, 선택)</span>
+            <input type="file" accept="image/*" data-action-change="tt-image">
+          </label>
+          <input type="hidden" name="ttimage" value="${esc(tt.image || '')}">
+          <div class="tt-preview">${tt.image ? `<img src="${esc(tt.image)}" alt="내 시간표 이미지"><button type="button" class="link-btn" data-action="remove-tt-image">이미지 삭제</button>` : ''}</div>
+        </div>
+      </fieldset>`;
+  }
+
+  // 시간표 칸 → 요일별 수업 구간
+  function classesFromGrid(form) {
+    const on = [...form.querySelectorAll('.tt-cell.on')].map((c) => ({ day: c.dataset.day, start: Number(c.dataset.hour), end: Number(c.dataset.hour) + 1 }));
+    return S.mergeRanges(on);
+  }
+
+  // 이미지를 가로 900px 이하 JPEG로 줄여서 data URL로 만듦 (브라우저 저장 공간 절약)
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const scale = Math.min(1, 900 / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   // ---------- 내 프로필 ----------
   function viewProfile() {
     const me = S.currentUser();
@@ -513,6 +582,7 @@
         <form data-form="senior" class="stack">
           <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 선배 프로필 공개하기</label>
           <label>자기소개 (${S.BIO_MAX}자 이내)<textarea name="bio" rows="4" maxlength="${S.BIO_MAX}" placeholder="전공, 동아리, 나눌 수 있는 이야기를 적어 주세요.">${esc(p.bio)}</textarea></label>
+          ${timetableEditor(p)}
           <fieldset class="avail-editor"><legend>가능한 시간</legend>
             <p class="sub">요일마다 밥약 가능한 시간을 하나씩 따로 추가하세요. 겹치는 시간은 저장할 때 하나로 합쳐져요.</p>
             <div class="avail-rows">${(p.avail || []).map(availRow).join('')}</div>
@@ -621,6 +691,22 @@
   }
 
   // ---------- 이벤트 ----------
+  // 시간표 이미지 선택 → 줄여서 미리보기, 저장은 '선배 프로필 저장'을 눌러야 됨
+  document.addEventListener('change', async (e) => {
+    if (e.target.dataset.actionChange !== 'tt-image' || !e.target.files[0]) return;
+    const box = e.target.closest('.tt-image');
+    try {
+      const url = await shrinkImage(e.target.files[0]);
+      box.querySelector('input[name=ttimage]').value = url;
+      box.querySelector('.tt-preview').innerHTML =
+        `<img src="${url}" alt="내 시간표 이미지"><button type="button" class="link-btn" data-action="remove-tt-image">이미지 삭제</button>`;
+      toast('시간표 이미지를 불러왔어요. 저장 버튼을 눌러야 반영돼요.');
+    } catch (err) {
+      toast('이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.');
+    }
+    e.target.value = '';
+  });
+
   // 대화 입력창: Enter로 보내기, Shift+Enter는 줄바꿈 (한글 조합 중에는 보내지 않음)
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
@@ -667,6 +753,33 @@
     }
     if (action === 'remove-range') {
       el.closest('.avail-row').remove();
+      return;
+    }
+    if (action === 'toggle-cell') {
+      el.classList.toggle('on');
+      el.setAttribute('aria-pressed', el.classList.contains('on'));
+      return;
+    }
+    if (action === 'clear-cells') {
+      el.form.querySelectorAll('.tt-cell.on').forEach((c) => {
+        c.classList.remove('on');
+        c.setAttribute('aria-pressed', 'false');
+      });
+      return;
+    }
+    if (action === 'fill-free') {
+      const form = el.form;
+      const free = S.freeRanges(classesFromGrid(form));
+      if (!free.length) return toast('2시간 이상 비는 공강 시간이 없어요.');
+      form.querySelector('.avail-rows').innerHTML = free.map(availRow).join('');
+      form.querySelector('.avail-editor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast(`공강 시간 ${free.length}개로 채웠어요. 밥약이 어려운 시간은 ✕로 지워 주세요.`);
+      return;
+    }
+    if (action === 'remove-tt-image') {
+      const box = el.closest('.tt-image');
+      box.querySelector('input[name=ttimage]').value = '';
+      box.querySelector('.tt-preview').innerHTML = '';
       return;
     }
     let err = null;
@@ -773,6 +886,7 @@
           bio: d.bio || '',
           avail: asArray(d.aday).map((day, i) => ({ day, start: Number(asArray(d.astart)[i]), end: Number(asArray(d.aend)[i]) })),
           isPublic: 'isPublic' in d,
+          timetable: { classes: classesFromGrid(form), image: d.ttimage || null },
         });
         if (!err) toast('선배 프로필을 저장했어요.');
         break;
