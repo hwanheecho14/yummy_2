@@ -206,11 +206,13 @@
     if (!Array.isArray(db.messages)) db.messages = []; // 대화 기능 이전에 저장된 데이터
   }
 
+  // 저장에 성공하면 true. 저장 공간이 꽉 찼거나 저장할 수 없는 환경이면 false (메모리에서만 동작)
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify(db));
+      return true;
     } catch (e) {
-      /* 저장 불가 환경(사생활 보호 모드 등): 메모리에서만 동작 */
+      return false;
     }
   }
 
@@ -268,7 +270,25 @@
   // ---------- 선배 프로필 ----------
   const getProfile = (userId) => db.profiles.find((p) => p.userId === userId) || null;
 
-  function saveProfile({ bio, avail, isPublic }) {
+  // ---------- 시간표 ----------
+  // 수업 시간(요일별 구간)을 받아 HOUR_MIN~HOUR_MAX 사이의 공강 중 MIN_RANGE시간 이상인 구간을 돌려줌
+  const TIMETABLE_START = 9;
+  const TIMETABLE_END = 19;
+  const IMAGE_MAX_CHARS = 400000; // 압축한 시간표 이미지 크기 한도 (약 300KB)
+  function freeRanges(classes) {
+    const out = [];
+    DAYS.forEach((day) => {
+      const busy = mergeRanges(classes.filter((c) => c.day === day));
+      let cursor = HOUR_MIN;
+      busy.concat([{ start: HOUR_MAX, end: HOUR_MAX }]).forEach((c) => {
+        if (c.start - cursor >= MIN_RANGE) out.push({ day, start: cursor, end: Math.min(c.start, HOUR_MAX) });
+        cursor = Math.max(cursor, c.end);
+      });
+    });
+    return out;
+  }
+
+  function saveProfile({ bio, avail, isPublic, timetable }) {
     const u = currentUser();
     if (!u) return '로그인이 필요해요.';
     if (bio.length > BIO_MAX) return `자기소개는 ${BIO_MAX}자 이내로 써 주세요.`;
@@ -285,8 +305,18 @@
       p = { userId: u.id };
       db.profiles.push(p);
     }
-    Object.assign(p, { bio: bio.trim(), avail: mergeRanges(avail), isPublic });
-    save();
+    if (timetable && timetable.image && timetable.image.length > IMAGE_MAX_CHARS) return '시간표 이미지가 너무 커요. 더 작은 이미지를 올려 주세요.';
+    const before = JSON.stringify(p);
+    Object.assign(p, {
+      bio: bio.trim(),
+      avail: mergeRanges(avail),
+      isPublic,
+      timetable: timetable ? { classes: mergeRanges(timetable.classes || []), image: timetable.image || null } : p.timetable || null,
+    });
+    if (!save()) {
+      Object.assign(p, JSON.parse(before)); // 저장 공간이 부족하면 되돌림
+      return '브라우저 저장 공간이 부족해서 저장하지 못했어요. 시간표 이미지를 빼고 다시 저장해 보세요.';
+    }
     return null;
   }
 
@@ -487,7 +517,7 @@
   load();
 
   window.Store = {
-    DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
