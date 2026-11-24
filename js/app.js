@@ -440,7 +440,7 @@
       : `<p class="empty">아직 주고받은 메시지가 없어요.<br>${tab === 'received' ? '신청해 준 후배에게' : '선배에게'} 먼저 인사해 보세요 👋</p>`;
     const composer = S.canChat(r)
       ? `<form data-form="chat" data-id="${esc(id)}" class="composer">
-           <textarea name="text" rows="1" maxlength="${S.MESSAGE_TEXT_MAX}" placeholder="메시지를 입력하세요" aria-label="메시지" required></textarea>
+           <textarea name="text" rows="1" maxlength="${S.MESSAGE_TEXT_MAX}" placeholder="메시지를 입력하세요 (Enter로 보내기)" aria-label="메시지" required></textarea>
            <button class="btn" type="submit">보내기</button>
          </form>`
       : '<p class="note center">끝난 신청이라 메시지를 보낼 수 없어요.</p>';
@@ -589,6 +589,15 @@
   }
 
   // ---------- 이벤트 ----------
+  // 대화 입력창: Enter로 보내기, Shift+Enter는 줄바꿈 (한글 조합 중에는 보내지 않음)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const box = e.target.closest('.composer textarea');
+    if (!box) return;
+    e.preventDefault();
+    box.form.requestSubmit();
+  });
+
   // 신청 폼: 월을 바꾸면 일 선택지를 다시 채우고, '선택 안 함'이면 일·시간대를 끔
   document.addEventListener('change', (e) => {
     const i = e.target.dataset.month;
