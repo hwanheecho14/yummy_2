@@ -80,12 +80,13 @@
     const link = (href, label, key, count) =>
       `<a href="${href}" class="${active === key ? 'active' : ''}">${label}${count ? `<span class="count">${count}</span>` : ''}</a>`;
     if (!me) {
-      nav.innerHTML = link('#/', '선배 찾기', 'list') + link('#/login', '로그인', 'login');
+      nav.innerHTML = link('#/', '선배 찾기', 'list') + link('#/event', '☕ 이벤트', 'event') + link('#/login', '로그인', 'login');
       return;
     }
     const pendingReceived = S.requestsOf(me.id).received.filter((r) => r.status === 'pending').length;
     nav.innerHTML =
       link('#/', '선배 찾기', 'list') +
+      link('#/event', '☕ 이벤트', 'event') +
       link('#/my', '내 밥약', 'my', pendingReceived) +
       link('#/notifications', '알림', 'notifications', S.unreadCount(me.id)) +
       link('#/profile', '내 프로필', 'profile') +
@@ -104,6 +105,7 @@
         <p>전공, 진로, 학교생활이 궁금하다면 부담 없이 선배에게 밥 한 끼 신청해 보세요.</p>
         ${me ? '' : '<p class="hero-cta"><a class="btn" href="#/login">로그인하고 시작하기</a></p>'}
       </section>
+      ${eventBanner()}
       <section class="filters" aria-label="검색 필터">
         <input type="search" id="f-q" placeholder="이름, 학과, 소개로 검색" value="${esc(filters.q)}" aria-label="검색어">
         <select id="f-dept" aria-label="학과">${opt('', '전체 학과', filters.dept)}${depts.map((d) => opt(d, d, filters.dept)).join('')}</select>
@@ -135,6 +137,7 @@
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
           <div class="chips">${chips(profile.days)}${chips(sortSlots(profile.slots).map(slotText))}</div>
+          ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
         </a>`;
     const section = (title, desc, items, tag, cls) =>
       items.length
@@ -203,6 +206,56 @@
       <section class="card">${action}</section>`;
   }
 
+  // ---------- 수요일 공강 커피 이벤트 ----------
+  function eventBanner() {
+    return `
+      <a class="event-banner" href="#/event">
+        <span class="event-icon" aria-hidden="true">☕</span>
+        <span class="event-text">
+          <strong>수요일 공강 밥약 이벤트</strong>
+          <span>매주 수요일 13:00~15:00 전체 공강 시간에 밥약을 잡으면 커피 기프티콘 추첨에 자동 응모!</span>
+        </span>
+        <span class="event-go">자세히 →</span>
+      </a>`;
+  }
+
+  function viewEvent() {
+    const me = S.currentUser();
+    const mine = me ? S.eventEntriesOf(me.id) : [];
+    const myBox = !me
+      ? '<p class="note">로그인하면 내 응모 내역을 볼 수 있어요.</p>'
+      : mine.length
+        ? `<p><strong>${mine.length}번 응모했어요.</strong></p><ul class="options">${mine
+            .map((r) => {
+              const other = S.userById(r.fromId === me.id ? r.toId : r.fromId);
+              const o = r.options[r.chosen];
+              return `<li>${fmtDate(o.date)} ${esc(slotText(o.slot))} · ${esc(other ? other.name : '')}님과 밥약</li>`;
+            })
+            .join('')}</ul>`
+        : '<p class="note">아직 응모한 밥약이 없어요. 수요일 13:00~15:00로 밥약을 잡아 보세요!</p>';
+    const seniors = S.publicSeniors().filter((x) => S.supportsEvent(x.profile)).length;
+    return `
+      <section class="event-hero">
+        <div class="event-big" aria-hidden="true">☕</div>
+        <h1>수요일 공강 밥약 이벤트</h1>
+        <p>매주 수요일 <strong>13:00~15:00</strong>는 우리 학교 전체 공강 시간이에요.<br>이 시간에 밥약을 잡으면 커피 기프티콘 추첨에 자동으로 응모돼요.</p>
+        <a class="btn" href="#/">공강 시간 가능한 선배 찾기</a>
+      </section>
+      <section class="card">
+        <h2>참여 방법</h2>
+        <ol class="steps">
+          <li>선배 목록에서 <span class="event-chip inline-chip">☕ 수요일 공강 밥약 가능</span> 표시가 있는 선배를 찾아요. (지금 ${seniors}명)</li>
+          <li>밥약 신청할 때 <strong>수요일</strong> 날짜와 <strong>13:00~15:00</strong> 시간대를 골라요. ☕ 표시가 붙어 있어요.</li>
+          <li>선배가 그 일시로 수락하면 <strong>신청한 후배와 선배 모두</strong> 응모돼요.</li>
+        </ol>
+        <p class="note">밥약이 확정될 때마다 1번씩 응모돼요. 지금까지 전체 ${S.eventEntryCount()}건 응모됐어요.</p>
+      </section>
+      <section class="card">
+        <h2>내 응모 내역</h2>
+        ${myBox}
+      </section>`;
+  }
+
   // 앞으로 8주 안에서 선배가 가능한 요일에 해당하는 날짜들 (YYYY-MM-DD)
   const WEEKDAY = '일월화수목금토';
   function availableDates(profile) {
@@ -218,7 +271,10 @@
   }
   const monthKey = (iso) => iso.slice(0, 7);
   const monthLabel = (key) => `${Number(key.slice(5, 7))}월`;
-  const dayLabel = (iso) => `${Number(iso.slice(8, 10))}일 (${WEEKDAY[new Date(iso + 'T00:00:00').getDay()]})`;
+  const dayLabel = (iso) => {
+    const wd = WEEKDAY[new Date(iso + 'T00:00:00').getDay()];
+    return `${Number(iso.slice(8, 10))}일 (${wd})${wd === S.EVENT.day ? ' ☕' : ''}`;
+  };
 
   // 월을 고르면 그 달의 가능한 날짜만 일(日) 선택지에 채움
   function dayOptions(dates, month) {
@@ -230,7 +286,9 @@
   }
 
   function requestForm(id, profile) {
-    const slotOpts = sortSlots(profile.slots).map((s) => `<option value="${esc(s)}">${esc(slotText(s))}</option>`).join('');
+    const slotOpts = sortSlots(profile.slots)
+      .map((s) => `<option value="${esc(s)}">${esc(slotText(s))}${s === S.EVENT.slot ? ' ☕ 수요일이면 이벤트' : ''}</option>`)
+      .join('');
     const dates = availableDates(profile);
     const months = [...new Set(dates.map(monthKey))];
     const row = (i) => {
@@ -253,6 +311,9 @@
     return `
       <h2>밥약 신청하기</h2>
       <p class="sub">선배가 가능한 요일(${esc(profile.days.join(', '))})의 날짜만 보여요. 월과 일을 눌러 고르고, 후보를 최대 3개까지 넣을 수 있어요.</p>
+      ${S.supportsEvent(profile)
+        ? '<p class="event-note">☕ 이 선배는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>'
+        : ''}
       <form data-form="request" data-id="${esc(id)}" class="stack">
         ${row(0)}${row(1)}${row(2)}
         <label for="msg">한마디 (${S.MESSAGE_MAX}자 이내)</label>
@@ -284,9 +345,16 @@
   function requestCard(r, tab) {
     const other = S.userById(tab === 'sent' ? r.toId : r.fromId);
     if (!other) return '';
+    const coffee = (o) => (S.isEventOption(o) ? ' ☕' : '');
     const options = r.options
-      .map((o, i) => `<li class="${r.chosen === i ? 'chosen' : ''}">${fmtDate(o.date)} ${esc(slotText(o.slot))}${r.chosen === i ? ' · 확정' : ''}</li>`)
+      .map((o, i) => `<li class="${r.chosen === i ? 'chosen' : ''}">${fmtDate(o.date)} ${esc(slotText(o.slot))}${coffee(o)}${r.chosen === i ? ' · 확정' : ''}</li>`)
       .join('');
+    let eventLine = '';
+    if (r.status === 'accepted' && S.isEventOption(r.options[r.chosen])) {
+      eventLine = '<p class="event-note">☕ 수요일 공강 밥약이라 커피 기프티콘 이벤트에 응모됐어요!</p>';
+    } else if (r.status === 'pending' && r.options.some(S.isEventOption)) {
+      eventLine = `<p class="event-note">${tab === 'received' ? '☕ 표시된 일시로 수락하면' : '선배가 ☕ 표시된 일시로 수락하면'} 두 사람 모두 커피 기프티콘 이벤트에 응모돼요.</p>`;
+    }
     let body = '';
     if (r.status === 'accepted') {
       body = `<div class="contact"><strong>${esc(other.name)}님 연락처</strong><span>${esc(other.contact || '등록된 연락처가 없어요.')}</span></div>
@@ -295,7 +363,7 @@
       body = `
         <form data-form="respond" data-id="${esc(r.id)}" class="stack">
           <fieldset><legend>확정할 일시</legend>
-            ${r.options.map((o, i) => `<label class="radio"><input type="radio" name="chosen" value="${i}" ${i === 0 ? 'checked' : ''}> ${fmtDate(o.date)} ${esc(slotText(o.slot))}</label>`).join('')}
+            ${r.options.map((o, i) => `<label class="radio"><input type="radio" name="chosen" value="${i}" ${i === 0 ? 'checked' : ''}> ${fmtDate(o.date)} ${esc(slotText(o.slot))}${coffee(o)}</label>`).join('')}
           </fieldset>
           <div class="inline">
             <button class="btn" type="submit" name="decision" value="accept">수락</button>
@@ -314,6 +382,7 @@
           ${badge(r.status)}
         </div>
         <ul class="options">${options}</ul>
+        ${eventLine}
         ${r.message ? `<blockquote>${esc(r.message)}</blockquote>` : ''}
         ${body}
       </article>`;
@@ -431,6 +500,7 @@
       case 'my': html = viewMy(params); break;
       case 'profile': html = viewProfile(); break;
       case 'notifications': html = viewNotifications(); break;
+      case 'event': html = viewEvent(); break;
       case 'login': html = viewLogin(params); break;
       case 'signup': html = viewSignup(params); active = 'login'; break;
       default: html = '<div class="card"><p>없는 페이지예요.</p><a class="btn ghost" href="#/">홈으로</a></div>';

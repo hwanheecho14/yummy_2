@@ -49,6 +49,8 @@
     return isoDate(d);
   }
 
+  const weekday = (iso) => '일월화수목금토'[new Date(iso + 'T00:00:00').getDay()];
+
   function today() {
     return isoDate(new Date());
   }
@@ -292,7 +294,6 @@
     if (!options.length) return '희망 일시를 하나 이상 골라 주세요.';
     if (options.some((o) => o.date < today())) return '지난 날짜는 고를 수 없어요.';
     if (options.some((o) => !p.slots.includes(o.slot))) return '선배가 가능한 시간대 중에서 골라 주세요.';
-    const weekday = (iso) => '일월화수목금토'[new Date(iso + 'T00:00:00').getDay()];
     if (options.some((o) => !p.days.includes(weekday(o.date)))) return '선배가 가능한 요일 중에서 골라 주세요.';
     if (new Set(options.map((o) => o.date + o.slot)).size !== options.length) return '같은 일시를 두 번 고를 수 없어요.';
     if (message.length > MESSAGE_MAX) return `한마디는 ${MESSAGE_MAX}자 이내로 써 주세요.`;
@@ -318,6 +319,11 @@
       accept ? `${me.name}님이 밥약을 수락했어요. 연락처를 확인해 보세요.` : `${me.name}님이 이번 밥약은 어렵다고 했어요.`,
       '#/my?tab=sent'
     );
+    if (accept && isEventOption(r.options[chosen])) {
+      const text = '☕ 수요일 공강 밥약이 확정돼서 커피 기프티콘 이벤트에 응모됐어요!';
+      notify(r.fromId, text, '#/event');
+      notify(r.toId, text, '#/event');
+    }
     save();
     return null;
   }
@@ -369,6 +375,17 @@
     save();
   }
 
+  // ---------- 수요일 공강 커피 이벤트 ----------
+  // 매주 수요일 13:00~15:00은 학교 전체 공강 시간. 이 시간으로 밥약이 확정되면 두 사람 모두 커피 기프티콘 추첨에 응모됩니다.
+  const EVENT = { day: '수', slot: 'h13', label: '수요일 13:00~15:00' };
+  function isEventOption(o) {
+    return !!o && o.slot === EVENT.slot && weekday(o.date) === EVENT.day;
+  }
+  const isEventRequest = (r) => r.status === 'accepted' && isEventOption(r.options[r.chosen]);
+  const eventEntriesOf = (userId) => db.requests.filter((r) => (r.fromId === userId || r.toId === userId) && isEventRequest(r));
+  const eventEntryCount = () => db.requests.filter(isEventRequest).length;
+  const supportsEvent = (profile) => profile.days.includes(EVENT.day) && profile.slots.includes(EVENT.slot);
+
   load();
 
   window.Store = {
@@ -377,5 +394,6 @@
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
     notificationsOf, unreadCount, markAllRead, reset,
+    EVENT, isEventOption, eventEntriesOf, eventEntryCount, supportsEvent,
   };
 })();
