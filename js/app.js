@@ -183,13 +183,14 @@
           ${foodLine(profile)}
           <div class="chips">${availChips(profile)}</div>
           ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
+          ${matchBadge(profile)}
         </a>`;
     const section = (title, desc, items, tag, cls) =>
       items.length
         ? `<section class="senior-section ${cls || ''}">
              <h2>${esc(title)} <span class="sub">${items.length}명</span></h2>
              ${desc ? `<p class="sub">${esc(desc)}</p>` : ''}
-             <div class="grid">${items.map((x) => card(x, tag)).join('')}</div>
+             <div class="grid">${byMatch(items).map((x) => card(x, tag)).join('')}</div>
            </section>`
         : '';
 
@@ -259,6 +260,7 @@
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
           <dt>가능한 시간</dt><dd><div class="chips">${availChips(profile)}</div></dd>
+          ${overlapRow(profile)}
           ${(profile.foods || []).length ? `<dt>좋아하는 메뉴</dt><dd><div class="chips">${(profile.foods).map((f) => `<span class="chip food">${esc(f)}</span>`).join("")}</div></dd>` : ""}
           ${(profile.spots || []).length ? `<dt>추천 맛집</dt><dd><ul class="spots">${profile.spots.map((s) => `<li>📍 ${esc(s)}</li>`).join("")}</ul></dd>` : ""}
           ${(profile.allergies || []).length ? `<dt>알레르기</dt><dd><div class="chips">${profile.allergies.map((a) => `<span class="chip allergy">⚠️ ${esc(a)}</span>`).join("")}</div></dd>` : ""}
@@ -386,6 +388,7 @@
     return `
       <h2>${S.kindOf(profile) === 'buddy' ? '밥친구 신청하기' : '밥약 신청하기'}</h2>
       ${allergyNote(profile, '이 ' + S.KINDS[S.kindOf(profile)])}
+      ${recommendBox(profile)}
       <p class="sub">가능한 요일(${esc(S.availDays(profile).join(', '))})의 날짜만 보여요. 날짜를 고르면 그날 가능한 시간이 나와요. 후보는 최대 3개까지 넣을 수 있어요.</p>
       ${S.supportsEvent(profile)
         ? `<p class="event-note">☕ 이 ${S.KINDS[S.kindOf(profile)]}는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>`
@@ -537,6 +540,54 @@
         <span aria-hidden="true">~</span>
         <select name="aend" aria-label="끝 시각">${hours(S.HOUR_MIN + S.MIN_RANGE, S.HOUR_MAX, a.end)}</select>
         <button type="button" class="link-btn remove" data-action="remove-range" aria-label="이 시간 삭제">✕</button>
+      </div>`;
+  }
+
+  // ---------- 겹치는 공강 ----------
+  const rangeText = (r) => `${r.day} ${r.start}:00~${r.end}:00`;
+  const matchOf = (profile) => {
+    const me = S.currentUser();
+    return me ? S.matchWith(me.id, profile) : null;
+  };
+  // 목록 카드: '🤝 공강 4시간 겹침 · 🍴 마라탕'
+  function matchBadge(profile) {
+    const m = matchOf(profile);
+    if (!m || (!m.hours && !m.sharedFoods.length)) return '';
+    const parts = [];
+    if (m.hours) parts.push(`🤝 공강 ${m.hours}시간 겹침`);
+    if (m.sharedFoods.length) parts.push(`🍴 ${m.sharedFoods.map(esc).join(', ')}`);
+    return `<div class="match-chip">${parts.join(' · ')}</div>`;
+  }
+  // 섹션 안에서 나와 잘 맞는 사람이 먼저 오도록 정렬 (로그인 안 했으면 그대로)
+  const byMatch = (items) => {
+    if (!S.currentUser()) return items;
+    return items
+      .map((x) => ({ x, s: matchOf(x.profile).score }))
+      .sort((a, b) => b.s - a.s)
+      .map((o) => o.x);
+  };
+  // 상세 화면: 나와 겹치는 공강
+  function overlapRow(profile) {
+    const me = S.currentUser();
+    if (!me || me.id === profile.userId) return '';
+    const m = matchOf(profile);
+    const body = m.overlap.length
+      ? `<div class="chips">${m.overlap.map((r) => `<span class="chip match">${esc(rangeText(r))}</span>`).join('')}</div>`
+      : !S.myFreeTime(me.id).length
+        ? '<span class="note"><a href="#/profile">내 시간표</a>를 등록하면 겹치는 공강을 찾아드려요.</span>'
+        : '<span class="note">2시간 이상 겹치는 공강이 없어요.</span>';
+    return `<dt>🤝 나와 겹치는 공강</dt><dd>${body}</dd>`;
+  }
+  // 신청 화면: 겹치는 공강으로 추천 일시 채우기
+  function recommendBox(profile) {
+    const me = S.currentUser();
+    if (!me) return '';
+    const recs = S.recommendTimes(me.id, profile);
+    if (!recs.length) return '';
+    const list = recs.map((r) => `${fmtDate(r.date)} ${slotText(r.slot)}${S.isEventOption(r) ? ' ☕' : ''}`).join(', ');
+    return `<div class="recommend">
+        <p>⭐ 시간표로 찾은 추천 일시: <b>${esc(list)}</b></p>
+        <button type="button" class="btn small" data-action="fill-recommend">추천 일시로 채우기</button>
       </div>`;
   }
 
@@ -826,6 +877,23 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    if (action === 'fill-recommend') {
+      // 추천 일시를 희망 일시 1~3번 칸에 차례로 넣음 (월 → 일 → 시간대 순서로 바꿔야 선택지가 채워짐)
+      const form = document.querySelector('form[data-form="request"]');
+      const recs = S.recommendTimes(S.currentUser().id, requestForm.profile);
+      const fire = (sel) => sel.dispatchEvent(new Event('change', { bubbles: true }));
+      recs.forEach((r, i) => {
+        const month = form.querySelector(`[data-month="${i}"]`);
+        month.value = r.date.slice(0, 7);
+        fire(month);
+        const day = form.querySelector(`[data-day="${i}"]`);
+        day.value = r.date;
+        fire(day);
+        form.querySelector(`[name="slot${i}"]`).value = r.slot;
+      });
+      toast(`추천 일시 ${recs.length}개를 채웠어요.`);
+      return;
+    }
     if (action === 'kind') {
       filters.kind = el.dataset.kind;
       filters.dept = '';
