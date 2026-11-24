@@ -292,6 +292,9 @@
     if (!options.length) return '희망 일시를 하나 이상 골라 주세요.';
     if (options.some((o) => o.date < today())) return '지난 날짜는 고를 수 없어요.';
     if (options.some((o) => !p.slots.includes(o.slot))) return '선배가 가능한 시간대 중에서 골라 주세요.';
+    const weekday = (iso) => '일월화수목금토'[new Date(iso + 'T00:00:00').getDay()];
+    if (options.some((o) => !p.days.includes(weekday(o.date)))) return '선배가 가능한 요일 중에서 골라 주세요.';
+    if (new Set(options.map((o) => o.date + o.slot)).size !== options.length) return '같은 일시를 두 번 고를 수 없어요.';
     if (message.length > MESSAGE_MAX) return `한마디는 ${MESSAGE_MAX}자 이내로 써 주세요.`;
     db.requests.push({
       id: uid('r'), fromId: me.id, toId, options, message: message.trim(),

@@ -203,19 +203,56 @@
       <section class="card">${action}</section>`;
   }
 
+  // 앞으로 8주 안에서 선배가 가능한 요일에 해당하는 날짜들 (YYYY-MM-DD)
+  const WEEKDAY = '일월화수목금토';
+  function availableDates(profile) {
+    const out = [];
+    const d = new Date(S.today() + 'T00:00:00');
+    for (let i = 0; i < 56; i++) {
+      if (profile.days.includes(WEEKDAY[d.getDay()])) {
+        out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  const monthKey = (iso) => iso.slice(0, 7);
+  const monthLabel = (key) => `${Number(key.slice(5, 7))}월`;
+  const dayLabel = (iso) => `${Number(iso.slice(8, 10))}일 (${WEEKDAY[new Date(iso + 'T00:00:00').getDay()]})`;
+
+  // 월을 고르면 그 달의 가능한 날짜만 일(日) 선택지에 채움
+  function dayOptions(dates, month) {
+    if (!month) return '<option value="">일</option>';
+    return dates
+      .filter((iso) => monthKey(iso) === month)
+      .map((iso) => `<option value="${iso}">${dayLabel(iso)}</option>`)
+      .join('');
+  }
+
   function requestForm(id, profile) {
     const slotOpts = sortSlots(profile.slots).map((s) => `<option value="${esc(s)}">${esc(slotText(s))}</option>`).join('');
-    const row = (i) => `
+    const dates = availableDates(profile);
+    const months = [...new Set(dates.map(monthKey))];
+    const row = (i) => {
+      const first = i === 0;
+      const monthOpts =
+        (first ? '' : '<option value="">선택 안 함</option>') +
+        months.map((m) => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+      return `
       <div class="option-row">
-        <label>희망 일시 ${i + 1}${i === 0 ? ' (필수)' : ' (선택)'}</label>
-        <div class="inline">
-          <input type="date" name="date${i}" min="${S.today()}" ${i === 0 ? 'required' : ''} aria-label="희망 날짜 ${i + 1}">
-          <select name="slot${i}" aria-label="희망 시간대 ${i + 1}">${slotOpts}</select>
+        <label>희망 일시 ${i + 1}${first ? ' (필수)' : ' (선택)'}</label>
+        <div class="date-row">
+          <select data-month="${i}" aria-label="희망 월 ${i + 1}">${monthOpts}</select>
+          <select name="date${i}" data-day="${i}" aria-label="희망 날짜 ${i + 1}" ${first ? 'required' : 'disabled'}>${dayOptions(dates, first ? months[0] : '')}</select>
+          <select name="slot${i}" aria-label="희망 시간대 ${i + 1}" ${first ? '' : 'disabled'}>${slotOpts}</select>
         </div>
       </div>`;
+    };
+    if (!dates.length) return '<p class="note">선배가 가능한 요일이 아직 등록되지 않았어요.</p>';
+    requestForm.dates = dates;
     return `
       <h2>밥약 신청하기</h2>
-      <p class="sub">선배가 가능한 요일: ${esc(profile.days.join(', '))}. 가능한 후보 일시를 최대 3개까지 골라 주세요.</p>
+      <p class="sub">선배가 가능한 요일(${esc(profile.days.join(', '))})의 날짜만 보여요. 월과 일을 눌러 고르고, 후보를 최대 3개까지 넣을 수 있어요.</p>
       <form data-form="request" data-id="${esc(id)}" class="stack">
         ${row(0)}${row(1)}${row(2)}
         <label for="msg">한마디 (${S.MESSAGE_MAX}자 이내)</label>
@@ -405,6 +442,19 @@
   }
 
   // ---------- 이벤트 ----------
+  // 신청 폼: 월을 바꾸면 일 선택지를 다시 채우고, '선택 안 함'이면 일·시간대를 끔
+  document.addEventListener('change', (e) => {
+    const i = e.target.dataset.month;
+    if (i == null) return;
+    const form = e.target.form;
+    const day = form.querySelector(`[data-day="${i}"]`);
+    const slot = form.querySelector(`[name="slot${i}"]`);
+    const month = e.target.value;
+    day.innerHTML = dayOptions(requestForm.dates || [], month);
+    day.disabled = !month;
+    slot.disabled = !month;
+  });
+
   document.addEventListener('input', (e) => {
     const map = { 'f-q': 'q', 'f-dept': 'dept', 'f-day': 'day', 'f-slot': 'slot' };
     if (map[e.target.id]) {
