@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v10';
-  const DB_VERSION = 10;
+  const KEY = 'bapyak-db-v11';
+  const DB_VERSION = 11;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -107,8 +107,10 @@
   // ---------- 초기 더미 데이터 ----------
   function seed() {
     const now = Date.now();
+    // 출생연도는 보통 입학 때 만 19세로 가정해 학번에서 계산 (재수·편입 등은 예시로 몇 명만 다르게)
+    const LATE = { u_s3: 1, u_s10: 1, u_s19: 2, u_b2: 1 };
     const user = (id, username, name, dept, year, contact) => ({
-      id, username, name, dept, year, contact, pwHash: null, createdAt: now,
+      id, username, name, dept, year, contact, birthYear: 2000 + Number(year) - 19 - (LATE[id] || 0), pwHash: null, createdAt: now,
     });
     const users = [
       user('u_s1', 'demo_senior', '김민준', '컴퓨터학부', '23', '카카오톡 오픈채팅 "민준 선배와 밥약"'),
@@ -261,7 +263,12 @@
   const userById = (id) => db.users.find((u) => u.id === id) || null;
   const currentUser = () => (db.session ? userById(db.session) : null);
 
-  async function signup({ username, password, name, dept, year, contact }) {
+  // 출생연도: 올해 기준 만 15~60세 사이
+  const BIRTH_MIN = () => new Date().getFullYear() - 60;
+  const BIRTH_MAX = () => new Date().getFullYear() - 15;
+  const validBirth = (y) => Number.isInteger(y) && y >= BIRTH_MIN() && y <= BIRTH_MAX();
+
+  async function signup({ username, password, name, dept, year, birthYear, contact }) {
     username = username.trim();
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return '아이디는 영문, 숫자, _ 로 3~20자여야 해요.';
     if (db.users.some((u) => u.username === username)) return '이미 사용 중인 아이디예요.';
@@ -269,8 +276,9 @@
     if (!name.trim()) return '이름을 입력해 주세요.';
     if (!DEPTS.includes(dept)) return '학과를 선택해 주세요.';
     if (!/^\d{2}$/.test(year)) return '학번은 입학년도 두 자리로 입력해 주세요. (예: 25)';
+    if (!validBirth(birthYear)) return '출생연도를 골라 주세요.';
     const u = {
-      id: uid('u'), username, name: name.trim(), dept, year, contact: contact.trim(),
+      id: uid('u'), username, name: name.trim(), dept, year, birthYear, contact: contact.trim(),
       pwHash: await hashPassword(password), createdAt: Date.now(),
     };
     db.users.push(u);
@@ -303,7 +311,8 @@
     if (!u) return '로그인이 필요해요.';
     if (!fields.name.trim()) return '이름을 입력해 주세요.';
     if (!/^\d{2}$/.test(fields.year)) return '학번은 입학년도 두 자리로 입력해 주세요.';
-    Object.assign(u, { name: fields.name.trim(), dept: fields.dept, year: fields.year, contact: fields.contact.trim() });
+    if (!validBirth(fields.birthYear)) return '출생연도를 골라 주세요.';
+    Object.assign(u, { name: fields.name.trim(), dept: fields.dept, year: fields.year, birthYear: fields.birthYear, contact: fields.contact.trim() });
     save();
     return null;
   }
@@ -575,7 +584,7 @@
   load();
 
   window.Store = {
-    KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,

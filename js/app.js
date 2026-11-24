@@ -47,10 +47,26 @@
     if (!(g >= 1)) return '';
     return g <= 4 ? `${g}학년` : '4학년+';
   }
+  // 나이: '05년생(21살)' — 생일을 모르므로 올해 연도 기준 나이(연 나이)로 표시
+  const ageText = (u) => {
+    if (!u.birthYear) return '';
+    return `${String(u.birthYear).slice(2)}년생(${new Date().getFullYear() - u.birthYear}살)`;
+  };
   const userLine = (u) => {
     const grade = gradeOf(u.year);
-    return `${esc(u.dept)} · ${esc(u.year)}학번${grade ? ` · ${grade}` : ''}${grade === '1학년' ? ' 🌱' : ''}`;
+    const age = ageText(u);
+    return `${esc(u.dept)} · ${esc(u.year)}학번${grade ? ` · ${grade}` : ''}${grade === '1학년' ? ' 🌱' : ''}${age ? ` · ${age}` : ''}`;
   };
+
+  // 출생연도 선택 상자 (최근 연도가 위로)
+  function birthSelect(current) {
+    const years = [];
+    for (let y = S.BIRTH_MAX(); y >= S.BIRTH_MIN(); y--) years.push(y);
+    return `<select name="birthYear" required>
+      <option value="" disabled ${current ? '' : 'selected'}>출생연도</option>
+      ${years.map((y) => `<option value="${y}" ${y === current ? 'selected' : ''}>${y}년</option>`).join('')}
+    </select>`;
+  }
 
   // 단과대학별로 묶은 학과 선택 상자
   function deptSelect(current) {
@@ -602,6 +618,7 @@
           <div class="inline two">
             <label>학과${deptSelect(me.dept)}</label>
             <label>학번 (입학년도 두 자리)<input name="year" value="${esc(me.year)}" inputmode="numeric" maxlength="2" required></label>
+            <label>출생연도${birthSelect(me.birthYear)}</label>
           </div>
           <label>연락처 <span class="sub">(밥약이 수락된 상대에게만 보여요)</span><input name="contact" value="${esc(me.contact)}" placeholder="예: 카카오톡 오픈채팅 링크 또는 인스타그램 @아이디"></label>
           <button class="btn" type="submit">기본 정보 저장</button>
@@ -683,6 +700,7 @@
           <div class="inline two">
             <label>학과${deptSelect('')}</label>
             <label>학번<input name="year" placeholder="25" inputmode="numeric" maxlength="2" required></label>
+            <label>출생연도${birthSelect(0)}</label>
           </div>
           <label>연락처 <span class="sub">(수락된 상대에게만 공개)</span><input name="contact" placeholder="예: 카카오톡 오픈채팅 링크 또는 인스타그램 @아이디"></label>
           <button class="btn" type="submit">가입하기</button>
@@ -891,7 +909,7 @@
       case 'signup':
         err = await S.signup({
           username: d.username || '', password: d.password || '', name: d.name || '',
-          dept: d.dept, year: (d.year || '').trim(), contact: d.contact || '',
+          dept: d.dept, year: (d.year || '').trim(), birthYear: Number(d.birthYear), contact: d.contact || '',
         });
         if (!err) {
           toast('가입을 환영해요!');
@@ -925,7 +943,7 @@
         }
         break;
       case 'user':
-        err = S.updateUser({ name: d.name || '', dept: d.dept, year: (d.year || '').trim(), contact: d.contact || '' });
+        err = S.updateUser({ name: d.name || '', dept: d.dept, year: (d.year || '').trim(), birthYear: Number(d.birthYear), contact: d.contact || '' });
         if (!err) toast('기본 정보를 저장했어요.');
         break;
       case 'senior':
