@@ -396,7 +396,66 @@
         ${eventLine}
         ${r.message ? `<blockquote>${esc(r.message)}</blockquote>` : ''}
         ${body}
+        ${chatButton(r)}
       </article>`;
+  }
+
+  // ---------- 신청별 대화 ----------
+  function chatButton(r) {
+    const me = S.currentUser();
+    const count = S.messagesOf(r.id).length;
+    if (!S.canChat(r) && !count) return '';
+    const unread = S.unreadMessages(r.id, me.id);
+    const label = S.canChat(r) ? '💬 대화하기' : '💬 지난 대화 보기';
+    return `<a class="btn ghost chat-btn" href="#/chat/${esc(r.id)}">${label}${unread ? ` <span class="count">${unread}</span>` : ''}</a>`;
+  }
+
+  function msgTime(ts) {
+    const d = new Date(ts);
+    const hm = `${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return new Date().toDateString() === d.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+  }
+
+  function viewChat(id) {
+    const me = S.currentUser();
+    const r = S.requestById(id);
+    if (!S.isParticipant(r, me.id)) {
+      return '<div class="card"><p>볼 수 없는 대화예요.</p><a class="btn ghost" href="#/my">내 밥약으로</a></div>';
+    }
+    const other = S.userById(r.fromId === me.id ? r.toId : r.fromId);
+    const tab = r.fromId === me.id ? 'sent' : 'received';
+    const msgs = S.messagesOf(id);
+    S.markMessagesRead(id, me.id);
+    const bubbles = msgs.length
+      ? msgs
+          .map((m) => {
+            const mine = m.fromId === me.id;
+            return `<div class="bubble-row ${mine ? 'mine' : ''}">
+                ${mine ? '' : initial(other)}
+                <div class="bubble">${esc(m.text)}</div>
+                <span class="bubble-time">${msgTime(m.createdAt)}</span>
+              </div>`;
+          })
+          .join('')
+      : `<p class="empty">아직 주고받은 메시지가 없어요.<br>${tab === 'received' ? '신청해 준 후배에게' : '선배에게'} 먼저 인사해 보세요 👋</p>`;
+    const composer = S.canChat(r)
+      ? `<form data-form="chat" data-id="${esc(id)}" class="composer">
+           <textarea name="text" rows="1" maxlength="${S.MESSAGE_TEXT_MAX}" placeholder="메시지를 입력하세요 (Enter로 보내기)" aria-label="메시지" required></textarea>
+           <button class="btn" type="submit">보내기</button>
+         </form>`
+      : '<p class="note center">끝난 신청이라 메시지를 보낼 수 없어요.</p>';
+    return `
+      <a class="back" href="#/my?tab=${tab}">← 내 밥약</a>
+      <section class="card chat">
+        <div class="card-head chat-head">${initial(other)}
+          <div class="grow"><strong>${esc(other.name)}</strong> <span class="sub">${userLine(other)}</span>
+            <div class="sub">${tab === 'sent' ? '내가 보낸' : '내가 받은'} 밥약 신청</div></div>
+          ${badge(r.status)}
+        </div>
+        <div class="messages" id="messages">${bubbles}</div>
+        ${composer}
+        <p class="note">연락처는 밥약이 수락되면 공개돼요. 그 전에는 여기서 편하게 이야기하세요.</p>
+      </section>`;
   }
 
   // ---------- 내 프로필 ----------
@@ -496,7 +555,7 @@
     const parts = (path || '/').split('/').filter(Boolean);
     const params = new URLSearchParams(query || '');
     const me = S.currentUser();
-    const needsLogin = ['my', 'profile', 'notifications'];
+    const needsLogin = ['my', 'profile', 'notifications', 'chat'];
 
     if (needsLogin.includes(parts[0]) && !me) {
       location.replace('#/login?next=' + encodeURIComponent(location.hash));
@@ -512,6 +571,7 @@
       case 'profile': html = viewProfile(); break;
       case 'notifications': html = viewNotifications(); break;
       case 'event': html = viewEvent(); break;
+      case 'chat': html = viewChat(parts[1]); active = 'my'; break;
       case 'login': html = viewLogin(params); break;
       case 'signup': html = viewSignup(params); active = 'login'; break;
       default: html = '<div class="card"><p>없는 페이지예요.</p><a class="btn ghost" href="#/">홈으로</a></div>';
@@ -520,9 +580,24 @@
     renderNav(active);
     renderResults();
     window.scrollTo(0, 0);
+    scrollChatToBottom();
+  }
+
+  function scrollChatToBottom() {
+    const box = document.getElementById('messages');
+    if (box) box.scrollTop = box.scrollHeight;
   }
 
   // ---------- 이벤트 ----------
+  // 대화 입력창: Enter로 보내기, Shift+Enter는 줄바꿈 (한글 조합 중에는 보내지 않음)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const box = e.target.closest('.composer textarea');
+    if (!box) return;
+    e.preventDefault();
+    box.form.requestSubmit();
+  });
+
   // 신청 폼: 월을 바꾸면 일 선택지를 다시 채우고, '선택 안 함'이면 일·시간대를 끔
   document.addEventListener('change', (e) => {
     const i = e.target.dataset.month;
@@ -628,6 +703,14 @@
         }
         break;
       }
+      case 'chat':
+        err = S.sendMessage(form.dataset.id, d.text || '');
+        if (!err) {
+          route();
+          document.querySelector('.composer textarea')?.focus();
+          return;
+        }
+        break;
       case 'respond':
         err = S.respond(form.dataset.id, true, Number(d.chosen));
         if (!err) {
