@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v9';
-  const DB_VERSION = 9;
+  const KEY = 'bapyak-db-v10';
+  const DB_VERSION = 10;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -136,6 +136,8 @@
       user('u_s23', 'hyunsung', '김현성', '지능형시스템공학과', '24', '인스타그램 @hyunsung.eats'),
       user('u_j1', 'demo_junior', '박정환', '지능형시스템공학과', '26', '카카오톡 ID jeonghwan_26'),
       user('u_j2', 'yerin', '한예린', '경영학부', '26', '인스타그램 @yerin.26'),
+      user('u_b1', 'bokyung', '추보경', '지능정보양자공학전공', '26', '인스타그램 @bokyung.26'),
+      user('u_b2', 'dohyun', '정도현', '문화콘텐츠학과', '25', '카카오톡 ID dohyun_eats'),
     ];
     const profile = (userId, bio, days, slots) => ({ userId, bio, avail: rangesFrom(days, slots), isPublic: true });
     const profiles = [
@@ -191,8 +193,15 @@
     };
     profiles.forEach((p) => {
       const [foods, spots] = tastes[p.userId] || [[], []];
-      Object.assign(p, { foods, spots });
+      Object.assign(p, { kind: 'senior', foods, spots });
     });
+    // 밥친구 찾기 예시: 학년 상관없이 같이 밥 먹을 친구를 찾는 프로필
+    const buddy = (userId, bio, days, slots, foods) => ({ ...profile(userId, bio, days, slots), kind: 'buddy', foods, spots: [] });
+    profiles.push(
+      buddy('u_b1', '26학번 새내기예요! 같은 과 동기나 공강 맞는 친구랑 학식 같이 먹고 싶어요 🍚', ['월', '수', '목'], ['lunch'], ['학식', '떡볶이', '마라탕']),
+      buddy('u_j2', '혼밥 탈출하고 싶어요. 경영 수업 끝나고 저녁 같이 먹을 친구 구해요!', ['화', '목'], ['dinner'], ['파스타', '김밥']),
+      buddy('u_b2', '공강에 새로운 맛집 찾아다니는 걸 좋아해요. 다른 과 친구도 환영!', ['수', '금'], ['lunch'], ['쌀국수', '초밥'])
+    );
     const requests = [
       {
         id: 'r_seed1', fromId: 'u_j2', toId: 'u_s1',
@@ -326,9 +335,10 @@
   const parseFoods = (text) => [...new Set(String(text || '').split(/[,，\n]/).map((s) => s.trim()).filter(Boolean))];
   const parseSpots = (text) => String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
-  function saveProfile({ bio, avail, isPublic, timetable, foods = [], spots = [] }) {
+  function saveProfile({ bio, avail, isPublic, timetable, foods = [], spots = [], kind = 'senior' }) {
     const u = currentUser();
     if (!u) return '로그인이 필요해요.';
+    if (!KINDS[kind]) return '프로필 종류를 다시 골라 주세요.';
     if (bio.length > BIO_MAX) return `자기소개는 ${BIO_MAX}자 이내로 써 주세요.`;
     if (isPublic && !bio.trim()) return '공개하려면 자기소개를 써 주세요.';
     for (const a of avail) {
@@ -350,6 +360,7 @@
     }
     const before = JSON.stringify(p);
     Object.assign(p, {
+      kind,
       bio: bio.trim(),
       avail: mergeRanges(avail),
       isPublic,
@@ -386,11 +397,14 @@
     save();
   }
 
-  // ---------- 선배 목록 ----------
-  function publicSeniors() {
+  // ---------- 공개 프로필 목록 ----------
+  // kind: 'senior'(선배가 밥약 받기) | 'buddy'(학년 상관없이 같이 밥 먹을 밥친구 찾기)
+  const KINDS = { senior: '선배', buddy: '밥친구' };
+  const kindOf = (p) => (p && p.kind === 'buddy' ? 'buddy' : 'senior');
+  function publicSeniors(kind = 'senior') {
     const me = currentUser();
     return db.profiles
-      .filter((p) => p.isPublic)
+      .filter((p) => p.isPublic && kindOf(p) === kind)
       .map((p) => ({ user: userById(p.userId), profile: p }))
       .filter((x) => x.user && (!me || (x.user.id !== me.id && !isBlocked(me.id, x.user.id))));
   }
@@ -410,7 +424,7 @@
     if (!me) return '로그인이 필요해요.';
     if (me.id === toId) return '자기 자신에게는 신청할 수 없어요.';
     const p = getProfile(toId);
-    if (!p || !p.isPublic) return '지금은 신청을 받지 않는 선배예요.';
+    if (!p || !p.isPublic) return '지금은 신청을 받지 않는 프로필이에요.';
     if (isBlocked(me.id, toId)) return '신청할 수 없는 사용자예요.';
     if (activeRequest(me.id, toId)) return '이 선배에게 이미 진행 중인 신청이 있어요.';
     if (pendingCountFor(toId) >= MAX_PENDING_PER_SENIOR) return '이 선배는 지금 신청이 많이 밀려 있어요. 나중에 다시 시도해 주세요.';
@@ -561,7 +575,7 @@
   load();
 
   window.Store = {
-    FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
