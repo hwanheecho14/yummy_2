@@ -1,40 +1,49 @@
-/* 밝은 테마 하나만 사용합니다 (기기 다크 모드와 상관없이 항상 밝게) */
+/* 음식 색에서 따온 팔레트: 토마토(주색) · 버터(강조) · 상추(완료) · 크림(배경) */
 :root {
   color-scheme: light;
-  --bg: #fffaf3;
+  --bg: #fff8ee;
+  --bg-dot: rgba(255, 140, 90, 0.08);
   --surface: #ffffff;
-  --text: #2b2522;
-  --muted: #7a706a;
-  --line: #f0e6da;
-  --primary: #f26b2e;
+  --text: #3d2b22;
+  --muted: #8a7468;
+  --line: #f3e2d0;
+  --primary: #ff6b45;
+  --primary-deep: #e5512c;
   --primary-ink: #ffffff;
-  --primary-soft: #ffeee4;
-  --accent: #ffc93c;
-  --accent-soft: #fff5d6;
-  --good: #2f8a4f;
-  --good-soft: #e5f6ea;
-  --bad: #c04a40;
+  --primary-soft: #ffe9e0;
+  --accent: #ffcf5c;
+  --accent-soft: #fff4d4;
+  --accent-ink: #8a5a00;
+  --good: #3f9a4f;
+  --good-soft: #e6f6e3;
+  --bad: #d0483d;
   --bad-soft: #fdeceb;
-  --chip: #fbf3ea;
-  --radius: 16px;
-  --shadow: 0 1px 2px rgba(120, 70, 20, 0.05), 0 6px 18px rgba(120, 70, 20, 0.07);
+  --chip: #fff1e2;
+  --radius: 22px;
+  --radius-sm: 14px;
+  --shadow: 0 3px 0 rgba(160, 90, 40, 0.07), 0 8px 24px rgba(160, 90, 40, 0.06);
+  --font-title: 'Jua', 'Noto Sans KR', sans-serif;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: linear-gradient(180deg, #fff3e6 0, var(--bg) 320px);
+  /* 체크무늬 식탁보 같은 은은한 물방울 배경 */
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--bg-dot) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
   color: var(--text);
-  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
-a { color: var(--primary); }
-h1 { font-size: 1.5rem; margin: 0 0 12px; }
-h2 { font-size: 1.15rem; margin: 0 0 8px; }
+a { color: var(--primary-deep); }
+h1, h2, .logo { font-family: var(--font-title); font-weight: 400; letter-spacing: 0.01em; }
+h1 { font-size: 1.7rem; margin: 0 0 12px; }
+h2 { font-size: 1.3rem; margin: 0 0 8px; }
 
 /* ---------- 상단 바 ---------- */
 .topbar {
