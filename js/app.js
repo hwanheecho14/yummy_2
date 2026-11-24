@@ -33,7 +33,7 @@
     cancelled: ['취소됨', 'muted'],
   };
   const badge = (status) => `<span class="badge badge-${STATUS[status][1]}">${STATUS[status][0]}</span>`;
-  const chips = (items) => items.map((t) => `<span class="chip">${esc(t)}</span>`).join('');
+  const chips = (items, kind = '') => items.map((t) => `<span class="chip ${kind}">${esc(t)}</span>`).join('');
   const userLine = (u) => `${esc(u.dept)} · ${esc(u.year)}학번`;
 
   // 단과대학별로 묶은 학과 선택 상자
@@ -136,7 +136,7 @@
           ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
-          <div class="chips">${chips(profile.days)}${chips(sortSlots(profile.slots).map(slotText))}</div>
+          <div class="chips">${chips(profile.days, 'day')}${chips(sortSlots(profile.slots).map(slotText))}</div>
           ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
         </a>`;
     const section = (title, desc, items, tag, cls) =>
@@ -198,7 +198,7 @@
         <div class="card-head big">${initial(user)}<div><h1>${esc(user.name)}</h1><div class="sub">${userLine(user)}</div></div></div>
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
-          <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'))}</div></dd>
+          <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'), 'day')}</div></dd>
           <dt>가능한 시간대</dt><dd><div class="chips">${chips(sortSlots(profile.slots).map(slotText))}</div></dd>
         </dl>
         ${safety}
