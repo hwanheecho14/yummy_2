@@ -41,7 +41,16 @@
   };
   const badge = (status) => `<span class="badge badge-${STATUS[status][1]}">${STATUS[status][0]}</span>`;
   const chips = (items, kind = '') => items.map((t) => `<span class="chip ${kind}">${esc(t)}</span>`).join('');
-  const userLine = (u) => `${esc(u.dept)} · ${esc(u.year)}학번`;
+  // 학번으로 올해 학년 계산 (26학번 → 2026년에 1학년). 5년 이상이면 '4학년+'
+  function gradeOf(year) {
+    const g = new Date().getFullYear() - (2000 + Number(year)) + 1;
+    if (!(g >= 1)) return '';
+    return g <= 4 ? `${g}학년` : '4학년+';
+  }
+  const userLine = (u) => {
+    const grade = gradeOf(u.year);
+    return `${esc(u.dept)} · ${esc(u.year)}학번${grade ? ` · ${grade}` : ''}${grade === '1학년' ? ' 🌱' : ''}`;
+  };
 
   // 단과대학별로 묶은 학과 선택 상자
   function deptSelect(current) {
