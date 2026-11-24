@@ -15,6 +15,9 @@
     S.mergeRanges(profile.avail)
       .map((a) => `<span class="chip time"><b>${esc(a.day)}</b> ${a.start}:00~${a.end}:00</span>`)
       .join('');
+  // 카드용 한 줄: '🍴 돈까스 · 마라탕 · 쌀국수'
+  const foodLine = (profile) =>
+    (profile.foods || []).length ? `<p class="food-line">🍴 ${profile.foods.slice(0, 3).map(esc).join(' · ')}</p>` : '';
 
   function fmtDate(iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -138,7 +141,7 @@
       if (filters.dept && user.dept !== filters.dept) return false;
       if (filters.day && !S.availDays(profile).includes(filters.day)) return false;
       if (filters.slot && !(filters.day ? S.windowsOn(profile, filters.day).includes(filters.slot) : S.hasWindow(profile, filters.slot))) return false;
-      if (q && ![user.name, user.dept, profile.bio].join(' ').toLowerCase().includes(q)) return false;
+      if (q && ![user.name, user.dept, profile.bio, ...(profile.foods || []), ...(profile.spots || [])].join(' ').toLowerCase().includes(q)) return false;
       return true;
     });
     if (!list.length) {
@@ -151,6 +154,7 @@
           ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
+          ${foodLine(profile)}
           <div class="chips">${availChips(profile)}</div>
           ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
         </a>`;
@@ -214,6 +218,8 @@
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
           <dt>가능한 시간</dt><dd><div class="chips">${availChips(profile)}</div></dd>
+          ${(profile.foods || []).length ? `<dt>좋아하는 메뉴</dt><dd><div class="chips">${(profile.foods).map((f) => `<span class="chip food">${esc(f)}</span>`).join("")}</div></dd>` : ""}
+          ${(profile.spots || []).length ? `<dt>추천 맛집</dt><dd><ul class="spots">${profile.spots.map((s) => `<li>📍 ${esc(s)}</li>`).join("")}</ul></dd>` : ""}
           ${profile.timetable && profile.timetable.image
             ? `<dt>시간표</dt><dd><details class="tt-view"><summary>선배 시간표 보기</summary><img src="${esc(profile.timetable.image)}" alt="${esc(user.name)} 선배의 시간표"></details></dd>`
             : ''}
@@ -582,6 +588,10 @@
         <form data-form="senior" class="stack">
           <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 선배 프로필 공개하기</label>
           <label>자기소개 (${S.BIO_MAX}자 이내)<textarea name="bio" rows="4" maxlength="${S.BIO_MAX}" placeholder="전공, 동아리, 나눌 수 있는 이야기를 적어 주세요.">${esc(p.bio)}</textarea></label>
+          <label>🍴 좋아하는 메뉴 <span class="sub">(쉼표로 구분, ${S.FOODS_MAX}개까지)</span>
+            <input name="foods" value="${esc((p.foods || []).join(', '))}" placeholder="예: 돈까스, 마라탕, 쌀국수"></label>
+          <label>📍 추천 맛집 <span class="sub">(한 줄에 한 곳, ${S.SPOTS_MAX}곳까지)</span>
+            <textarea name="spots" rows="3" placeholder="예: 학교 앞 돈까스집 - 치즈돈까스 추천&#10;학생식당 2층 - 금요일 특식">${esc((p.spots || []).join('\n'))}</textarea></label>
           ${timetableEditor(p)}
           <fieldset class="avail-editor"><legend>가능한 시간</legend>
             <p class="sub">요일마다 밥약 가능한 시간을 하나씩 따로 추가하세요. 겹치는 시간은 저장할 때 하나로 합쳐져요.</p>
@@ -884,6 +894,8 @@
       case 'senior':
         err = S.saveProfile({
           bio: d.bio || '',
+          foods: S.parseFoods(d.foods),
+          spots: S.parseSpots(d.spots),
           avail: asArray(d.aday).map((day, i) => ({ day, start: Number(asArray(d.astart)[i]), end: Number(asArray(d.aend)[i]) })),
           isPublic: 'isPublic' in d,
           timetable: { classes: classesFromGrid(form), image: d.ttimage || null },
