@@ -48,7 +48,13 @@
     const legacy = current && !known ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
     return `<select name="dept" required>${placeholder}${legacy}${groups}</select>`;
   }
-  const initial = (u) => `<div class="avatar" aria-hidden="true">${esc(u.name.slice(0, 1))}</div>`;
+  // 사용자마다 항상 같은 음식 이모지 아바타 (id로 정해짐)
+  const FOODS = ['🍙', '🍜', '🥟', '🍕', '🍔', '🍝', '🍣', '🥪', '🌮', '🍛', '🥞', '🍩', '🍱', '🥗'];
+  const hashOf = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const initial = (u) => {
+    const h = hashOf(u.id);
+    return `<div class="avatar tone-${h % 4}" aria-hidden="true">${FOODS[h % FOODS.length]}</div>`;
+  };
 
   function toast(msg) {
     const el = document.getElementById('toast');
