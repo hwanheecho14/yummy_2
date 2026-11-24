@@ -33,7 +33,7 @@
     cancelled: ['취소됨', 'muted'],
   };
   const badge = (status) => `<span class="badge badge-${STATUS[status][1]}">${STATUS[status][0]}</span>`;
-  const chips = (items) => items.map((t) => `<span class="chip">${esc(t)}</span>`).join('');
+  const chips = (items, kind = '') => items.map((t) => `<span class="chip ${kind}">${esc(t)}</span>`).join('');
   const userLine = (u) => `${esc(u.dept)} · ${esc(u.year)}학번`;
 
   // 단과대학별로 묶은 학과 선택 상자
@@ -48,7 +48,13 @@
     const legacy = current && !known ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
     return `<select name="dept" required>${placeholder}${legacy}${groups}</select>`;
   }
-  const initial = (u) => `<div class="avatar" aria-hidden="true">${esc(u.name.slice(0, 1))}</div>`;
+  // 사용자마다 항상 같은 음식 이모지 아바타 (id로 정해짐)
+  const FOODS = ['🍙', '🍜', '🥟', '🍕', '🍔', '🍝', '🍣', '🥪', '🌮', '🍛', '🥞', '🍩', '🍱', '🥗'];
+  const hashOf = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const initial = (u) => {
+    const h = hashOf(u.id);
+    return `<div class="avatar tone-${h % 4}" aria-hidden="true">${FOODS[h % FOODS.length]}</div>`;
+  };
 
   function toast(msg) {
     const el = document.getElementById('toast');
@@ -101,9 +107,14 @@
     const me = S.currentUser();
     return `
       <section class="hero">
-        <h1>선배에게 밥약 신청하기</h1>
-        <p>전공, 진로, 학교생활이 궁금하다면 부담 없이 선배에게 밥 한 끼 신청해 보세요.</p>
-        ${me ? '' : '<p class="hero-cta"><a class="btn" href="#/login">로그인하고 시작하기</a></p>'}
+        <div class="hero-copy">
+          <h1>선배, 밥 한 끼 해요!</h1>
+          <p>전공, 진로, 학교생활이 궁금하다면 부담 없이 선배에게 밥약을 신청해 보세요.</p>
+          ${me ? '' : '<p class="hero-cta"><a class="btn" href="#/login">로그인하고 시작하기</a></p>'}
+        </div>
+        <div class="hero-plate" aria-hidden="true">
+          <span class="food f1">🍜</span><span class="food f2">🍙</span><span class="food f3">🥟</span>
+        </div>
       </section>
       ${eventBanner()}
       <section class="filters" aria-label="검색 필터">
@@ -136,7 +147,7 @@
           ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
-          <div class="chips">${chips(profile.days)}${chips(sortSlots(profile.slots).map(slotText))}</div>
+          <div class="chips">${chips(profile.days, 'day')}${chips(sortSlots(profile.slots).map(slotText))}</div>
           ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
         </a>`;
     const section = (title, desc, items, tag, cls) =>
@@ -151,7 +162,7 @@
     if (!me) {
       box.innerHTML =
         '<p class="note login-hint">로그인하면 우리 학과·단과대 선배를 먼저 모아서 보여드려요.</p>' +
-        section('전체 선배', '', list, '', '');
+        section('🍚 전체 선배', '', list, '', '');
       return;
     }
     const myCollege = S.collegeOf(me.dept);
@@ -159,9 +170,9 @@
     const sameCollege = list.filter((x) => x.user.dept !== me.dept && myCollege && S.collegeOf(x.user.dept) === myCollege);
     const others = list.filter((x) => !sameDept.includes(x) && !sameCollege.includes(x));
     box.innerHTML =
-      section(`우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
-      section(`같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
-      section(sameDept.length || sameCollege.length ? '다른 학과 선배' : '전체 선배', '', others, '', '');
+      section(`🍽️ 우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
+      section(`🥢 같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
+      section(sameDept.length || sameCollege.length ? '🍚 다른 학과 선배' : '🍚 전체 선배', '', others, '', '');
   }
 
   // ---------- 선배 상세 + 신청 ----------
@@ -198,7 +209,7 @@
         <div class="card-head big">${initial(user)}<div><h1>${esc(user.name)}</h1><div class="sub">${userLine(user)}</div></div></div>
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
-          <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'))}</div></dd>
+          <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'), 'day')}</div></dd>
           <dt>가능한 시간대</dt><dd><div class="chips">${chips(sortSlots(profile.slots).map(slotText))}</div></dd>
         </dl>
         ${safety}
