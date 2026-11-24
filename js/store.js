@@ -1,15 +1,18 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v3';
-  const DB_VERSION = 3;
+  const KEY = 'bapyak-db-v4';
+  const DB_VERSION = 4;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
-  const SLOTS = [
-    { id: 'breakfast', label: '아침', time: '8–10시' },
-    { id: 'lunch', label: '점심', time: '11–14시' },
-    { id: 'dinner', label: '저녁', time: '17–20시' },
-  ];
+  // 2시간짜리 밥약 시간대를 1시간 간격으로: 8:00~10:00, 9:00~11:00, ..., 18:00~20:00
+  const SLOTS = Array.from({ length: 11 }, (_, i) => {
+    const start = 8 + i;
+    return { id: 'h' + start, start, label: `${start}:00~${start + 2}:00` };
+  });
+  // 예전 시간대(아침/점심/저녁)를 새 시간대로 바꿀 때 사용
+  const LEGACY = { breakfast: ['h8'], lunch: ['h11', 'h12', 'h13'], dinner: ['h17', 'h18'] };
+  const expandSlots = (ids) => [...new Set(ids.flatMap((id) => LEGACY[id] || [id]))];
   // 한양대학교 ERICA 단과대학·학과 (출처: studyerica.hanyang.ac.kr 학과안내, 2026년 기준)
   const COLLEGES = [
     { name: '공학대학', depts: ['건축학부', '건설환경공학과', '교통∙물류공학과', '전자공학부', '재료화학공학과', '기계공학과', '산업경영공학과', '생명나노공학과', '로봇공학과'] },
@@ -94,7 +97,7 @@
       user('u_j1', 'demo_junior', '조새내', '컴퓨터학부', '25', '카카오톡 ID saenae_25'),
       user('u_j2', 'yerin', '한예린', '경영학부', '25', '인스타그램 @yerin.25'),
     ];
-    const profile = (userId, bio, days, slots) => ({ userId, bio, days, slots, isPublic: true });
+    const profile = (userId, bio, days, slots) => ({ userId, bio, days, slots: expandSlots(slots), isPublic: true });
     const profiles = [
       profile('u_s1', '백엔드 개발 동아리 운영진이에요. 전공 공부, 동아리, 인턴 준비까지 편하게 물어보세요!', ['월', '수', '금'], ['lunch', 'dinner']),
       profile('u_s2', '마케팅 공모전을 여러 번 나갔어요. 학교 앞 맛집은 제가 제일 잘 압니다.', ['화', '목'], ['lunch']),
@@ -122,19 +125,19 @@
     const requests = [
       {
         id: 'r_seed1', fromId: 'u_j2', toId: 'u_s1',
-        options: [{ date: plusDays(2), slot: 'lunch' }, { date: plusDays(4), slot: 'dinner' }],
+        options: [{ date: plusDays(2), slot: 'h12' }, { date: plusDays(4), slot: 'h18' }],
         message: '안녕하세요 선배님! 컴퓨터학부 복수전공을 고민 중인데 이야기 들어보고 싶어요.',
         status: 'pending', chosen: null, createdAt: now - DAY_MS, respondedAt: null,
       },
       {
         id: 'r_seed2', fromId: 'u_j1', toId: 'u_s2',
-        options: [{ date: plusDays(1), slot: 'lunch' }],
+        options: [{ date: plusDays(1), slot: 'h12' }],
         message: '경영학 복수전공에 관심이 있어요. 밥 한번 같이 먹어요!',
         status: 'accepted', chosen: 0, createdAt: now - 2 * DAY_MS, respondedAt: now - DAY_MS,
       },
       {
         id: 'r_seed3', fromId: 'u_j1', toId: 'u_s3',
-        options: [{ date: plusDays(3), slot: 'dinner' }, { date: plusDays(5), slot: 'dinner' }],
+        options: [{ date: plusDays(3), slot: 'h18' }, { date: plusDays(5), slot: 'h18' }],
         message: '문화인류학 교양을 듣고 관심이 생겼어요.',
         status: 'pending', chosen: null, createdAt: now - 2 * DAY_MS, respondedAt: null,
       },
@@ -288,6 +291,7 @@
     if (pendingCountFor(toId) >= MAX_PENDING_PER_SENIOR) return '이 선배는 지금 신청이 많이 밀려 있어요. 나중에 다시 시도해 주세요.';
     if (!options.length) return '희망 일시를 하나 이상 골라 주세요.';
     if (options.some((o) => o.date < today())) return '지난 날짜는 고를 수 없어요.';
+    if (options.some((o) => !p.slots.includes(o.slot))) return '선배가 가능한 시간대 중에서 골라 주세요.';
     if (message.length > MESSAGE_MAX) return `한마디는 ${MESSAGE_MAX}자 이내로 써 주세요.`;
     db.requests.push({
       id: uid('r'), fromId: me.id, toId, options, message: message.trim(),

@@ -9,7 +9,8 @@
   const esc = (s) =>
     String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const slotOf = (id) => S.SLOTS.find((s) => s.id === id);
-  const slotText = (id) => (slotOf(id) ? `${slotOf(id).label}(${slotOf(id).time})` : id);
+  const slotText = (id) => (slotOf(id) ? slotOf(id).label : id);
+  const sortSlots = (ids) => S.SLOTS.filter((s) => ids.includes(s.id)).map((s) => s.id);
 
   function fmtDate(iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -133,7 +134,7 @@
           ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
-          <div class="chips">${chips(profile.days)}${chips(profile.slots.map((s) => slotOf(s)?.label || s))}</div>
+          <div class="chips">${chips(profile.days)}${chips(sortSlots(profile.slots).map(slotText))}</div>
         </a>`;
     const section = (title, desc, items, tag, cls) =>
       items.length
@@ -195,7 +196,7 @@
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
           <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'))}</div></dd>
-          <dt>가능한 시간대</dt><dd><div class="chips">${chips(profile.slots.map(slotText))}</div></dd>
+          <dt>가능한 시간대</dt><dd><div class="chips">${chips(sortSlots(profile.slots).map(slotText))}</div></dd>
         </dl>
         ${safety}
       </article>
@@ -203,7 +204,7 @@
   }
 
   function requestForm(id, profile) {
-    const slotOpts = profile.slots.map((s) => `<option value="${esc(s)}">${esc(slotText(s))}</option>`).join('');
+    const slotOpts = sortSlots(profile.slots).map((s) => `<option value="${esc(s)}">${esc(slotText(s))}</option>`).join('');
     const row = (i) => `
       <div class="option-row">
         <label>희망 일시 ${i + 1}${i === 0 ? ' (필수)' : ' (선택)'}</label>
@@ -308,7 +309,7 @@
           <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 선배 프로필 공개하기</label>
           <label>자기소개 (${S.BIO_MAX}자 이내)<textarea name="bio" rows="4" maxlength="${S.BIO_MAX}" placeholder="전공, 동아리, 나눌 수 있는 이야기를 적어 주세요.">${esc(p.bio)}</textarea></label>
           <fieldset><legend>가능한 요일</legend><div class="checks">${S.DAYS.map((d) => check('days', d, d, p.days.includes(d))).join('')}</div></fieldset>
-          <fieldset><legend>가능한 시간대</legend><div class="checks">${S.SLOTS.map((s) => check('slots', s.id, `${s.label} (${s.time})`, p.slots.includes(s.id))).join('')}</div></fieldset>
+          <fieldset><legend>가능한 시간대</legend><div class="checks">${S.SLOTS.map((s) => check('slots', s.id, s.label, p.slots.includes(s.id))).join('')}</div></fieldset>
           <button class="btn" type="submit">선배 프로필 저장</button>
         </form>
       </section>
