@@ -107,9 +107,14 @@
     const me = S.currentUser();
     return `
       <section class="hero">
-        <h1>선배에게 밥약 신청하기</h1>
-        <p>전공, 진로, 학교생활이 궁금하다면 부담 없이 선배에게 밥 한 끼 신청해 보세요.</p>
-        ${me ? '' : '<p class="hero-cta"><a class="btn" href="#/login">로그인하고 시작하기</a></p>'}
+        <div class="hero-copy">
+          <h1>선배, 밥 한 끼 해요!</h1>
+          <p>전공, 진로, 학교생활이 궁금하다면 부담 없이 선배에게 밥약을 신청해 보세요.</p>
+          ${me ? '' : '<p class="hero-cta"><a class="btn" href="#/login">로그인하고 시작하기</a></p>'}
+        </div>
+        <div class="hero-plate" aria-hidden="true">
+          <span class="food f1">🍜</span><span class="food f2">🍙</span><span class="food f3">🥟</span>
+        </div>
       </section>
       ${eventBanner()}
       <section class="filters" aria-label="검색 필터">
@@ -157,7 +162,7 @@
     if (!me) {
       box.innerHTML =
         '<p class="note login-hint">로그인하면 우리 학과·단과대 선배를 먼저 모아서 보여드려요.</p>' +
-        section('전체 선배', '', list, '', '');
+        section('🍚 전체 선배', '', list, '', '');
       return;
     }
     const myCollege = S.collegeOf(me.dept);
@@ -165,9 +170,9 @@
     const sameCollege = list.filter((x) => x.user.dept !== me.dept && myCollege && S.collegeOf(x.user.dept) === myCollege);
     const others = list.filter((x) => !sameDept.includes(x) && !sameCollege.includes(x));
     box.innerHTML =
-      section(`우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
-      section(`같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
-      section(sameDept.length || sameCollege.length ? '다른 학과 선배' : '전체 선배', '', others, '', '');
+      section(`🍽️ 우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
+      section(`🥢 같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
+      section(sameDept.length || sameCollege.length ? '🍚 다른 학과 선배' : '🍚 전체 선배', '', others, '', '');
   }
 
   // ---------- 선배 상세 + 신청 ----------
