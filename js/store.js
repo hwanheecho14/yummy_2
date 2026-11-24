@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v2';
-  const DB_VERSION = 2;
+  const KEY = 'bapyak-db-v3';
+  const DB_VERSION = 3;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -75,6 +75,22 @@
       user('u_s4', 'yujin', '최유진', '기계공학과', '21', '카카오톡 ID yujin_demo'),
       user('u_s5', 'haneul', '정하늘', '산업디자인학과', '20', '인스타그램 @haneul.design'),
       user('u_s6', 'doyoon', '강도윤', '컴퓨터학부', '22', '카카오톡 ID doyoon_dev'),
+      user('u_s7', 'sujin', '윤수진', '인공지능학과', '21', '카카오톡 ID sujin_ai'),
+      user('u_s8', 'taeho', '임태호', 'ICT융합학부', '20', '인스타그램 @taeho.ict'),
+      user('u_s9', 'jimin', '서지민', '컴퓨터학부', '21', '카카오톡 오픈채팅 "지민 선배 밥약"'),
+      user('u_s10', 'hyunwoo', '오현우', '전자공학부', '19', '카카오톡 ID hyunwoo_ee'),
+      user('u_s11', 'nayeon', '신나연', '건축학부', '20', '인스타그램 @nayeon.arch'),
+      user('u_s12', 'seungmin', '권승민', '로봇공학과', '21', '카카오톡 ID seungmin_robot'),
+      user('u_s13', 'dahye', '황다혜', '산업경영공학과', '22', '카카오톡 ID dahye_ime'),
+      user('u_s14', 'minseo', '배민서', '경제학부', '20', '인스타그램 @minseo.econ'),
+      user('u_s15', 'eunji', '송은지', '광고홍보학과', '21', '인스타그램 @eunji.ad'),
+      user('u_s16', 'junho', '류준호', '정보사회미디어학과', '20', '카카오톡 ID junho_media'),
+      user('u_s17', 'chaeyoung', '문채영', '일본학과', '21', '카카오톡 ID chaeyoung_jp'),
+      user('u_s18', 'sihyun', '백시현', '스포츠과학부', '20', '인스타그램 @sihyun.sports'),
+      user('u_s19', 'yuna', '조유나', '약학과', '19', '카카오톡 ID yuna_pharm'),
+      user('u_s20', 'gunwoo', '남건우', '수리데이터사이언스학과', '21', '카카오톡 ID gunwoo_data'),
+      user('u_s21', 'sohee', '안소희', '커뮤니케이션디자인학과', '22', '인스타그램 @sohee.design'),
+      user('u_s22', 'jaewon', '홍재원', '재료화학공학과', '20', '카카오톡 ID jaewon_mce'),
       user('u_j1', 'demo_junior', '조새내', '컴퓨터학부', '25', '카카오톡 ID saenae_25'),
       user('u_j2', 'yerin', '한예린', '경영학부', '25', '인스타그램 @yerin.25'),
     ];
@@ -86,6 +102,22 @@
       profile('u_s4', '자동차 동아리 활동 중! 전공 과목 선택 팁 알려드릴게요.', ['수', '목', '금'], ['breakfast', 'lunch']),
       profile('u_s5', '졸업 전시 준비 중이에요. 포트폴리오나 디자인 툴 얘기 좋아해요.', ['목', '금'], ['lunch', 'dinner']),
       profile('u_s6', '알고리즘 스터디장이에요. 코딩테스트, 복수전공 고민 상담 환영!', ['월', '화', '목'], ['lunch']),
+      profile('u_s7', '머신러닝 연구실 학부연구생이에요. AI 대학원이나 연구실 생활이 궁금하면 물어보세요.', ['화', '수', '목'], ['lunch', 'dinner']),
+      profile('u_s8', '웹·앱 서비스 기획과 디자인을 같이 하고 있어요. 팀플 꿀팁 알려드릴게요.', ['수', '금'], ['lunch']),
+      profile('u_s9', '교내 해커톤 2회 수상! 첫 프로젝트 시작하는 법 같이 이야기해요.', ['월', '수'], ['lunch', 'dinner']),
+      profile('u_s10', '반도체 회사 인턴 다녀왔어요. 전자공학 진로와 대외활동 얘기 환영해요.', ['화', '목'], ['dinner']),
+      profile('u_s11', '5년제 건축학 전공, 설계 스튜디오 밤샘 버티는 법 알려드려요.', ['수', '목'], ['lunch']),
+      profile('u_s12', '로봇 대회 동아리 회장이에요. 하드웨어 좋아하는 후배 대환영!', ['월', '수', '금'], ['breakfast', 'lunch']),
+      profile('u_s13', '데이터 분석 공모전 준비 중이에요. 복수전공·교환학생 이야기 나눠요.', ['화', '수'], ['lunch']),
+      profile('u_s14', '경제학부 학회 활동 중이에요. 금융권 취업 준비 이야기 편하게 해요.', ['월', '목'], ['dinner']),
+      profile('u_s15', '광고 공모전 수상 경험 있어요. 포트폴리오, 동아리 고민 들어드릴게요.', ['수', '금'], ['lunch', 'dinner']),
+      profile('u_s16', '학보사 기자 출신이에요. 글쓰기와 언론사 대외활동 이야기 좋아해요.', ['화', '수'], ['lunch']),
+      profile('u_s17', '일본 교환학생 다녀왔어요. JLPT, 교환 준비 팁 알려드릴게요.', ['월', '수'], ['lunch']),
+      profile('u_s18', '교내 축구 동아리 주장이에요. 운동하면서 학교생활 즐기는 법 공유해요.', ['수', '목', '금'], ['breakfast', 'dinner']),
+      profile('u_s19', '약대 생활과 실습 이야기 궁금하면 언제든 신청하세요.', ['수'], ['lunch']),
+      profile('u_s20', '통계·데이터 분석 스터디 운영 중! 수학 과목 공부법 알려드려요.', ['월', '화', '수'], ['lunch']),
+      profile('u_s21', '브랜딩 디자인 외주 경험 있어요. 툴 배우는 순서 같이 정해봐요.', ['수', '목'], ['lunch', 'dinner']),
+      profile('u_s22', '배터리 소재 연구실 학부연구생이에요. 연구실 컨택 방법 알려드릴게요.', ['화', '수', '금'], ['lunch']),
     ];
     const requests = [
       {

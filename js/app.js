@@ -109,7 +109,7 @@
         <select id="f-day" aria-label="요일">${opt('', '전체 요일', filters.day)}${S.DAYS.map((d) => opt(d, d + '요일', filters.day)).join('')}</select>
         <select id="f-slot" aria-label="시간대">${opt('', '전체 시간대', filters.slot)}${S.SLOTS.map((s) => opt(s.id, s.label, filters.slot)).join('')}</select>
       </section>
-      <section id="results" class="grid"></section>`;
+      <div id="results"></div>`;
   }
 
   function renderResults() {
@@ -127,16 +127,37 @@
       box.innerHTML = '<p class="empty">조건에 맞는 선배가 없어요. 필터를 바꿔 보세요.</p>';
       return;
     }
-    box.innerHTML = list
-      .map(
-        ({ user, profile }) => `
-        <a class="card senior-card" href="#/senior/${esc(user.id)}">
+    const me = S.currentUser();
+    const card = ({ user, profile }, tag) => `
+        <a class="card senior-card ${tag ? 'highlight' : ''}" href="#/senior/${esc(user.id)}">
+          ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
           <div class="chips">${chips(profile.days)}${chips(profile.slots.map((s) => slotOf(s)?.label || s))}</div>
-        </a>`
-      )
-      .join('');
+        </a>`;
+    const section = (title, desc, items, tag, cls) =>
+      items.length
+        ? `<section class="senior-section ${cls || ''}">
+             <h2>${esc(title)} <span class="sub">${items.length}명</span></h2>
+             ${desc ? `<p class="sub">${esc(desc)}</p>` : ''}
+             <div class="grid">${items.map((x) => card(x, tag)).join('')}</div>
+           </section>`
+        : '';
+
+    if (!me) {
+      box.innerHTML =
+        '<p class="note login-hint">로그인하면 우리 학과·단과대 선배를 먼저 모아서 보여드려요.</p>' +
+        section('전체 선배', '', list, '', '');
+      return;
+    }
+    const myCollege = S.collegeOf(me.dept);
+    const sameDept = list.filter((x) => x.user.dept === me.dept);
+    const sameCollege = list.filter((x) => x.user.dept !== me.dept && myCollege && S.collegeOf(x.user.dept) === myCollege);
+    const others = list.filter((x) => !sameDept.includes(x) && !sameCollege.includes(x));
+    box.innerHTML =
+      section(`우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
+      section(`같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
+      section(sameDept.length || sameCollege.length ? '다른 학과 선배' : '전체 선배', '', others, '', '');
   }
 
   // ---------- 선배 상세 + 신청 ----------
