@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v11';
-  const DB_VERSION = 11;
+  const KEY = 'bapyak-db-v12';
+  const DB_VERSION = 12;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];

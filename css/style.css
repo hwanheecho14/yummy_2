@@ -581,3 +581,14 @@ blockquote {
   .date-row select[name^='slot'] { grid-column: 1 / -1; }
   .card { padding: 14px; }
 }
+
+/* ---------- 알레르기 ---------- */
+.chip.allergy { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+.allergy-note {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bad-soft);
+  color: var(--text);
+  font-size: 0.88rem;
+}

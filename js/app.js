@@ -261,6 +261,7 @@
           <dt>가능한 시간</dt><dd><div class="chips">${availChips(profile)}</div></dd>
           ${(profile.foods || []).length ? `<dt>좋아하는 메뉴</dt><dd><div class="chips">${(profile.foods).map((f) => `<span class="chip food">${esc(f)}</span>`).join("")}</div></dd>` : ""}
           ${(profile.spots || []).length ? `<dt>추천 맛집</dt><dd><ul class="spots">${profile.spots.map((s) => `<li>📍 ${esc(s)}</li>`).join("")}</ul></dd>` : ""}
+          ${(profile.allergies || []).length ? `<dt>알레르기</dt><dd><div class="chips">${profile.allergies.map((a) => `<span class="chip allergy">⚠️ ${esc(a)}</span>`).join("")}</div></dd>` : ""}
           ${profile.timetable && profile.timetable.image
             ? `<dt>시간표</dt><dd><details class="tt-view"><summary>선배 시간표 보기</summary><img src="${esc(profile.timetable.image)}" alt="${esc(user.name)} 선배의 시간표"></details></dd>`
             : ''}
@@ -384,6 +385,7 @@
     requestForm.dates = dates;
     return `
       <h2>${S.kindOf(profile) === 'buddy' ? '밥친구 신청하기' : '밥약 신청하기'}</h2>
+      ${allergyNote(profile, '이 ' + S.KINDS[S.kindOf(profile)])}
       <p class="sub">가능한 요일(${esc(S.availDays(profile).join(', '))})의 날짜만 보여요. 날짜를 고르면 그날 가능한 시간이 나와요. 후보는 최대 3개까지 넣을 수 있어요.</p>
       ${S.supportsEvent(profile)
         ? `<p class="event-note">☕ 이 ${S.KINDS[S.kindOf(profile)]}는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>`
@@ -515,6 +517,7 @@
             <div class="sub">${tab === 'sent' ? '내가 보낸' : '내가 받은'} 밥약 신청</div></div>
           ${badge(r.status)}
         </div>
+        ${allergyNote(S.getProfile(other.id) || {}, other.name + '님')}
         <div class="messages" id="messages">${bubbles}</div>
         ${composer}
         <p class="note">연락처는 밥약이 수락되면 공개돼요. 그 전에는 여기서 편하게 이야기하세요.</p>
@@ -536,6 +539,23 @@
         <button type="button" class="link-btn remove" data-action="remove-range" aria-label="이 시간 삭제">✕</button>
       </div>`;
   }
+
+  // ---------- 알레르기 ----------
+  function allergyEditor(p) {
+    const mine = p.allergies || [];
+    const others = mine.filter((a) => !S.ALLERGENS.includes(a));
+    return `
+      <fieldset><legend>⚠️ 알레르기 <span class="sub">(메뉴 고를 때 상대가 참고해요)</span></legend>
+        <div class="checks">${S.ALLERGENS.map(
+          (a) => `<label class="check"><input type="checkbox" name="allergy" value="${esc(a)}" ${mine.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`
+        ).join('')}</div>
+        <input name="allergyOther" value="${esc(others.join(', '))}" placeholder="기타 (쉼표로 구분, 예: 오이, 고수)" aria-label="기타 알레르기" style="margin-top:8px">
+      </fieldset>`;
+  }
+  const allergyNote = (profile, who) =>
+    (profile.allergies || []).length
+      ? `<p class="allergy-note">⚠️ ${esc(who)}는 <b>${profile.allergies.map(esc).join(', ')}</b> 알레르기가 있어요. 메뉴 고를 때 참고해 주세요.</p>`
+      : '';
 
   // ---------- 시간표 올리기 ----------
   // 수업 칸을 눌러 표시하면 공강 시간을 계산해 '가능한 시간'에 채울 수 있음. 시간표 캡처 이미지도 첨부 가능
@@ -640,6 +660,7 @@
             <input name="foods" value="${esc((p.foods || []).join(', '))}" placeholder="예: 돈까스, 마라탕, 쌀국수"></label>
           <label>📍 추천 맛집 <span class="sub">(한 줄에 한 곳, ${S.SPOTS_MAX}곳까지)</span>
             <textarea name="spots" rows="3" placeholder="예: 학교 앞 돈까스집 - 치즈돈까스 추천&#10;학생식당 2층 - 금요일 특식">${esc((p.spots || []).join('\n'))}</textarea></label>
+          ${allergyEditor(p)}
           ${timetableEditor(p)}
           <fieldset class="avail-editor"><legend>가능한 시간</legend>
             <p class="sub">요일마다 밥약 가능한 시간을 하나씩 따로 추가하세요. 겹치는 시간은 저장할 때 하나로 합쳐져요.</p>
@@ -952,6 +973,7 @@
           kind: d.kind || 'senior',
           foods: S.parseFoods(d.foods),
           spots: S.parseSpots(d.spots),
+          allergies: [...new Set([...asArray(d.allergy), ...S.parseFoods(d.allergyOther)])],
           avail: asArray(d.aday).map((day, i) => ({ day, start: Number(asArray(d.astart)[i]), end: Number(asArray(d.aend)[i]) })),
           isPublic: 'isPublic' in d,
           timetable: { classes: classesFromGrid(form), image: d.ttimage || null },
