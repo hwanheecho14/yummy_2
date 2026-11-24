@@ -639,3 +639,47 @@ blockquote {
 .dutch-body { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .dutch-result { font-weight: 600; color: var(--text); }
 .dutch-body .btn { align-self: flex-start; }
+
+/* ---------- 학식 · 주변 맛집 ---------- */
+.food-hero { background: linear-gradient(135deg, var(--good-soft), var(--accent-soft)); }
+.cafeteria-grid { margin-top: 12px; }
+.cafeteria { margin: 0; }
+.cafeteria h3 { font-family: var(--font-title); font-weight: 400; font-size: 1.25rem; margin: 0; }
+.day-tabs { display: flex; gap: 6px; margin: 10px 0; }
+.day-tab {
+  font: inherit;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.day-tab.active { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); font-weight: 700; }
+.menu { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.menu[hidden] { display: none; }
+.nearby-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+.nearby {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.nearby-icon { font-size: 1.6rem; }
+.map-links a { font-weight: 600; }
+.spot-list { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.spot-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+}

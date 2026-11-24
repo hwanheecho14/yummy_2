@@ -118,12 +118,13 @@
     const link = (href, label, key, count) =>
       `<a href="${href}" class="${active === key ? 'active' : ''}">${label}${count ? `<span class="count">${count}</span>` : ''}</a>`;
     if (!me) {
-      nav.innerHTML = link('#/', '밥약 찾기', 'list') + link('#/event', '☕ 이벤트', 'event') + link('#/login', '로그인', 'login');
+      nav.innerHTML = link('#/', '밥약 찾기', 'list') + link('#/food', '🍽️ 학식·맛집', 'food') + link('#/event', '☕ 이벤트', 'event') + link('#/login', '로그인', 'login');
       return;
     }
     const pendingReceived = S.requestsOf(me.id).received.filter((r) => r.status === 'pending').length;
     nav.innerHTML =
       link('#/', '밥약 찾기', 'list') +
+      link('#/food', '🍽️ 학식·맛집', 'food') +
       link('#/event', '☕ 이벤트', 'event') +
       link('#/my', '내 밥약', 'my', pendingReceived) +
       link('#/notifications', '알림', 'notifications', S.unreadCount(me.id)) +
@@ -545,6 +546,95 @@
       </div>`;
   }
 
+  // ---------- 학식 · 주변 맛집/카페 ----------
+  // 학교 식단은 서버 없이 불러올 수 없어서 요일별 '예시 메뉴'를 보여주고, 실제 메뉴는 검색으로 확인하게 안내
+  const CAFETERIA = [
+    {
+      name: '학생식당',
+      hours: '점심 11:00~14:00 · 저녁 17:00~18:30 (예시)',
+      menu: {
+        월: ['제육볶음', '된장찌개', '계란말이'], 화: ['돈까스', '우동', '양배추샐러드'], 수: ['치킨마요덮밥', '미소국', '단무지'],
+        목: ['김치찌개', '고등어구이', '잡채'], 금: ['카레라이스', '떡볶이', '요구르트'],
+      },
+    },
+    {
+      name: '교직원식당',
+      hours: '점심 11:30~13:30 (예시)',
+      menu: {
+        월: ['소불고기', '시금치국', '나물무침'], 화: ['닭갈비', '콩나물국', '샐러드'], 수: ['생선까스', '크림스프', '피클'],
+        목: ['비빔밥', '유부장국', '군만두'], 금: ['순두부찌개', '오징어볶음', '과일'],
+      },
+    },
+  ];
+  const mapLinks = (query) => {
+    const q = encodeURIComponent(query);
+    return `<a href="https://map.kakao.com/?q=${q}" target="_blank" rel="noopener">카카오맵</a>
+      · <a href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener">네이버지도</a>
+      · <a href="https://www.google.com/maps/search/${q}" target="_blank" rel="noopener">구글지도</a>`;
+  };
+  const NEARBY = [
+    ['🍚', '한식·국밥', '한양대 에리카 한식'],
+    ['🍢', '분식', '한양대 에리카 분식'],
+    ['🍜', '중식·마라탕', '한양대 에리카 중식'],
+    ['🍣', '일식·초밥', '한양대 에리카 일식'],
+    ['🍝', '양식·파스타', '한양대 에리카 양식'],
+    ['🍔', '버거·패스트푸드', '한양대 에리카 햄버거'],
+    ['☕', '카페', '한양대 에리카 카페'],
+    ['🍰', '디저트·베이커리', '한양대 에리카 디저트'],
+    ['🚇', '한대앞역 맛집', '한대앞역 맛집'],
+    ['🧋', '한대앞역 카페', '한대앞역 카페'],
+  ];
+
+  function viewFood() {
+    const wd = WEEKDAY[new Date().getDay()];
+    const day = S.DAYS.includes(wd) ? wd : '월';
+    const cafeteria = CAFETERIA.map(
+      (c) => `
+        <article class="card cafeteria">
+          <h3>${esc(c.name)}</h3>
+          <p class="sub">${esc(c.hours)}</p>
+          <div class="day-tabs" role="tablist">${S.DAYS.map(
+            (d) => `<button type="button" role="tab" class="day-tab ${d === day ? 'active' : ''}" data-action="menu-day" data-day="${d}" aria-selected="${d === day}">${d}</button>`
+          ).join('')}</div>
+          ${S.DAYS.map((d) => `<ul class="menu" data-menu-day="${d}" ${d === day ? '' : 'hidden'}>${c.menu[d].map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`).join('')}
+        </article>`
+    ).join('');
+    // 선배·밥친구 프로필에 적힌 추천 맛집 모아보기
+    const spots = [];
+    S.publicSeniors('senior').concat(S.publicSeniors('buddy')).forEach(({ user, profile }) =>
+      (profile.spots || []).forEach((s) => spots.push({ s, user }))
+    );
+    const spotList = spots.length
+      ? `<ul class="spot-list">${spots
+          .slice(0, 12)
+          .map(({ s, user }) => {
+            const name = s.split(' - ')[0];
+            return `<li><div><b>📍 ${esc(s)}</b><div class="sub">${esc(user.name)} · ${esc(user.dept)} 추천</div></div>
+              <div class="sub map-links">${mapLinks('한양대 에리카 ' + name)}</div></li>`;
+          })
+          .join('')}</ul>`
+      : '<p class="empty">아직 추천 맛집이 없어요.</p>';
+    return `
+      <section class="hero food-hero">
+        <div class="hero-copy">
+          <h1>오늘 뭐 먹지? 🍽️</h1>
+          <p>교내 학식 메뉴와 학교 주변 맛집·카페를 한곳에서 보고, 밥약 장소를 정해 보세요.</p>
+        </div>
+      </section>
+      <h2>🏫 교내 식당 <span class="sub">오늘은 ${day}요일</span></h2>
+      <p class="note">⚠️ 학교 식단은 이 사이트에서 직접 불러올 수 없어서 <b>예시 메뉴</b>를 보여줘요.
+        실제 메뉴는 <a href="https://www.google.com/search?q=${encodeURIComponent('한양대 에리카 학식 메뉴')}" target="_blank" rel="noopener">학교 식단 검색</a>으로 확인해 주세요.</p>
+      <div class="grid cafeteria-grid">${cafeteria}</div>
+      <h2 style="margin-top:24px">🗺️ 학교 주변 맛집·카페 찾기</h2>
+      <p class="note">누르면 지도 앱에서 학교 근처 가게가 바로 검색돼요.</p>
+      <div class="nearby-grid">${NEARBY.map(
+        ([icon, label, q]) => `<div class="nearby"><span class="nearby-icon">${icon}</span><b>${esc(label)}</b><div class="sub map-links">${mapLinks(q)}</div></div>`
+      ).join('')}</div>
+      <h2 style="margin-top:24px">⭐ 선배·밥친구 추천 맛집</h2>
+      <p class="note">프로필에 적힌 추천 맛집을 모았어요. (예시 데이터의 가게 이름은 지어낸 이름이에요)</p>
+      ${spotList}`;
+  }
+
   // ---------- 더치페이(엔빵) 계산기 ----------
   // 1인당 금액은 10원 단위로 올림. 실제 송금은 하지 않고, 송금처 메모만 함께 공유
   const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -949,6 +1039,7 @@
       case 'profile': html = viewProfile(); break;
       case 'notifications': html = viewNotifications(); break;
       case 'event': html = viewEvent(); break;
+      case 'food': html = viewFood(); break;
       case 'chat': html = viewChat(parts[1]); active = 'my'; break;
       case 'meetup': html = parts[1] === 'new' ? viewMeetupNew() : viewMeetup(parts[1]); active = 'list'; break;
       case 'login': html = viewLogin(params); break;
@@ -1031,6 +1122,16 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    if (action === 'menu-day') {
+      // 학식 카드 안에서 요일 탭 전환
+      const card = el.closest('.cafeteria');
+      card.querySelectorAll('.day-tab').forEach((t) => {
+        t.classList.toggle('active', t === el);
+        t.setAttribute('aria-selected', t === el);
+      });
+      card.querySelectorAll('.menu').forEach((m) => (m.hidden = m.dataset.menuDay !== el.dataset.day));
+      return;
+    }
     if (action === 'send-dutch') {
       const box = el.closest('.dutch-body');
       const { total, people, memo } = readDutch(box);
