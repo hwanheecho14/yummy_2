@@ -519,6 +519,35 @@
     return `<a class="btn ghost chat-btn" href="#/chat/${esc(r.id)}">${label}${unread ? ` <span class="count">${unread}</span>` : ''}</a>`;
   }
 
+  // 메시지 보내기 (입력창, 빠른 답장 공통). 성공하면 대화 화면을 다시 그리고 입력창에 포커스
+  function sendChat(requestId, text) {
+    const err = S.sendMessage(requestId, text);
+    if (err) {
+      toast(err);
+      return false;
+    }
+    route();
+    document.querySelector('.composer textarea')?.focus();
+    return true;
+  }
+
+  // 빠른 답장: 누르면 바로 보내지는 기본 문장. 상대가 마지막에 보낸 말에 맞춰 첫 줄을 바꿈
+  function quickReplies(msgs, me, tab) {
+    const last = msgs[msgs.length - 1];
+    const fromOther = last && last.fromId !== me.id ? last.text : '';
+    let first;
+    if (!msgs.length) first = tab === 'received' ? '안녕하세요! 신청 고마워요 😊' : '안녕하세요! 밥약 신청드린 ' + me.name + '이에요 😊';
+    else if (/안녕|반가/.test(fromOther)) first = '안녕하세요! 반가워요 😊';
+    else if (/언제|시간|괜찮/.test(fromOther)) first = '저는 신청한 시간 다 괜찮아요!';
+    else if (/어디|장소|메뉴|뭐 먹/.test(fromOther)) first = '학식 어때요? 다른 곳도 좋아요!';
+    else if (/엔빵|원/.test(fromOther)) first = '확인했어요! 바로 보낼게요 💸';
+    else first = '좋아요! 😄';
+    const list = [first, '언제 시간 괜찮으세요?', '어디서 먹을까요?', '좋아요! 그때 봬요 🙌', '감사합니다 🙏'];
+    return `<div class="quick-replies" aria-label="빠른 답장">${[...new Set(list)]
+      .map((t) => `<button type="button" class="chip quick" data-action="quick-reply" data-text="${esc(t)}">${esc(t)}</button>`)
+      .join('')}</div>`;
+  }
+
   function msgTime(ts) {
     const d = new Date(ts);
     const hm = `${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -548,7 +577,8 @@
           .join('')
       : `<p class="empty">아직 주고받은 메시지가 없어요.<br>${tab === 'received' ? '신청해 준 후배에게' : '선배에게'} 먼저 인사해 보세요 👋</p>`;
     const composer = S.canChat(r)
-      ? `<form data-form="chat" data-id="${esc(id)}" class="composer">
+      ? `${quickReplies(msgs, me, tab)}
+         <form data-form="chat" data-id="${esc(id)}" class="composer">
            <textarea name="text" rows="1" maxlength="${S.MESSAGE_TEXT_MAX}" placeholder="메시지를 입력하세요 (Enter로 보내기)" aria-label="메시지" required></textarea>
            <button class="btn" type="submit">보내기</button>
          </form>`
@@ -1171,6 +1201,10 @@
       card.querySelectorAll('.menu').forEach((m) => (m.hidden = m.dataset.menuDay !== el.dataset.day));
       return;
     }
+    if (action === 'quick-reply') {
+      const form = document.querySelector('form[data-form="chat"]');
+      return sendChat(form.dataset.id, el.dataset.text);
+    }
     if (action === 'send-dutch') {
       const box = el.closest('.dutch-body');
       const { total, people, memo } = readDutch(box);
@@ -1345,13 +1379,8 @@
         return go(`#/meetup/${res.id}`);
       }
       case 'chat':
-        err = S.sendMessage(form.dataset.id, d.text || '');
-        if (!err) {
-          route();
-          document.querySelector('.composer textarea')?.focus();
-          return;
-        }
-        break;
+        sendChat(form.dataset.id, d.text || '');
+        return;
       case 'respond':
         err = S.respond(form.dataset.id, true, Number(d.chosen));
         if (!err) {

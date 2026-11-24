@@ -708,3 +708,17 @@ blockquote {
 .ask p { margin: 0; font-weight: 600; }
 .ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .btn.danger { background: var(--bad); box-shadow: 0 4px 0 color-mix(in srgb, var(--bad) 70%, black); }
+
+/* ---------- 빠른 답장 ---------- */
+.quick-replies { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.quick-replies::-webkit-scrollbar { display: none; }
+.chip.quick {
+  flex: none;
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip.quick:hover { border-color: var(--primary); color: var(--primary-deep); }
