@@ -195,12 +195,12 @@
     };
     profiles.forEach((p) => {
       const [foods, spots] = tastes[p.userId] || [[], []];
-      Object.assign(p, { kind: 'senior', foods, spots });
+      Object.assign(p, { kind: 'senior', foods, spots, allergies: { u_s1: ['땅콩'], u_s5: ['갑각류'], u_s14: ['복숭아', '견과류'] }[p.userId] || [] });
     });
     // 밥친구 찾기 예시: 학년 상관없이 같이 밥 먹을 친구를 찾는 프로필
-    const buddy = (userId, bio, days, slots, foods) => ({ ...profile(userId, bio, days, slots), kind: 'buddy', foods, spots: [] });
+    const buddy = (userId, bio, days, slots, foods, allergies = []) => ({ ...profile(userId, bio, days, slots), kind: 'buddy', foods, spots: [], allergies });
     profiles.push(
-      buddy('u_b1', '26학번 새내기예요! 같은 과 동기나 공강 맞는 친구랑 학식 같이 먹고 싶어요 🍚', ['월', '수', '목'], ['lunch'], ['학식', '떡볶이', '마라탕']),
+      buddy('u_b1', '26학번 새내기예요! 같은 과 동기나 공강 맞는 친구랑 학식 같이 먹고 싶어요 🍚', ['월', '수', '목'], ['lunch'], ['학식', '떡볶이', '마라탕'], ['우유']),
       buddy('u_j2', '혼밥 탈출하고 싶어요. 경영 수업 끝나고 저녁 같이 먹을 친구 구해요!', ['화', '목'], ['dinner'], ['파스타', '김밥']),
       buddy('u_b2', '공강에 새로운 맛집 찾아다니는 걸 좋아해요. 다른 과 친구도 환영!', ['수', '금'], ['lunch'], ['쌀국수', '초밥'])
     );
@@ -344,7 +344,11 @@
   const parseFoods = (text) => [...new Set(String(text || '').split(/[,，\n]/).map((s) => s.trim()).filter(Boolean))];
   const parseSpots = (text) => String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
-  function saveProfile({ bio, avail, isPublic, timetable, foods = [], spots = [], kind = 'senior' }) {
+  // 알레르기: 자주 쓰는 항목 체크 + 기타 직접 입력 (최대 8개)
+  const ALLERGENS = ['갑각류', '견과류', '땅콩', '우유', '달걀', '밀', '대두', '생선', '복숭아'];
+  const ALLERGY_MAX = 8;
+
+  function saveProfile({ bio, avail, isPublic, timetable, foods = [], spots = [], kind = 'senior', allergies = [] }) {
     const u = currentUser();
     if (!u) return '로그인이 필요해요.';
     if (!KINDS[kind]) return '프로필 종류를 다시 골라 주세요.';
@@ -361,6 +365,7 @@
     if (foods.some((f) => f.length > 15)) return '메뉴 이름은 15자 이내로 적어 주세요.';
     if (spots.length > SPOTS_MAX) return `추천 맛집은 ${SPOTS_MAX}곳까지 적어 주세요.`;
     if (spots.some((s) => s.length > 60)) return '맛집 한 줄은 60자 이내로 적어 주세요.';
+    if (allergies.length > ALLERGY_MAX) return `알레르기는 ${ALLERGY_MAX}개까지 적어 주세요.`;
     if (timetable && timetable.image && timetable.image.length > IMAGE_MAX_CHARS) return '시간표 이미지가 너무 커요. 더 작은 이미지를 올려 주세요.';
     let p = getProfile(u.id);
     if (!p) {
@@ -376,6 +381,7 @@
       timetable: timetable ? { classes: mergeRanges(timetable.classes || []), image: timetable.image || null } : p.timetable || null,
       foods,
       spots,
+      allergies,
     });
     if (!save()) {
       Object.assign(p, JSON.parse(before)); // 저장 공간이 부족하면 되돌림
@@ -584,7 +590,7 @@
   load();
 
   window.Store = {
-    BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    ALLERGENS, BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
