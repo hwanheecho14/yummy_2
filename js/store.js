@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v8';
-  const DB_VERSION = 8;
+  const KEY = 'bapyak-db-v9';
+  const DB_VERSION = 9;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -133,7 +133,8 @@
       user('u_s20', 'gunwoo', '남건우', '수리데이터사이언스학과', '24', '카카오톡 ID gunwoo_data'),
       user('u_s21', 'sohee', '안소희', '영상디자인학과', '25', '인스타그램 @sohee.design'),
       user('u_s22', 'jaewon', '홍재원', '배터리소재화학공학과', '23', '카카오톡 ID jaewon_mce'),
-      user('u_j1', 'demo_junior', '조새내', '컴퓨터학부', '25', '카카오톡 ID saenae_25'),
+      user('u_s23', 'hyunsung', '김현성', '지능형시스템공학과', '24', '인스타그램 @hyunsung.eats'),
+      user('u_j1', 'demo_junior', '박정환', '지능형시스템공학과', '26', '카카오톡 ID jeonghwan_26'),
       user('u_j2', 'yerin', '한예린', '경영학부', '26', '인스타그램 @yerin.26'),
     ];
     const profile = (userId, bio, days, slots) => ({ userId, bio, avail: rangesFrom(days, slots), isPublic: true });
@@ -160,6 +161,7 @@
       profile('u_s20', '통계·데이터 분석 스터디 운영 중! 수학 과목 공부법 알려드려요.', ['월', '화', '수'], ['lunch']),
       profile('u_s21', '모션그래픽 외주 경험 있어요. 영상 툴 배우는 순서 같이 정해봐요.', ['수', '목'], ['lunch', 'dinner']),
       profile('u_s22', '배터리 소재 연구실 학부연구생이에요. 연구실 컨택 방법 알려드릴게요.', ['화', '수', '금'], ['lunch']),
+      profile('u_s23', '지능형시스템공학과 3학년이에요. 전공 과목 순서, 팀플, 과 생활 다 물어보세요! 새내기 환영해요.', ['화', '수', '목'], ['lunch', 'dinner']),
     ];
     // 좋아하는 메뉴와 추천 맛집 (예시라 가게 이름은 지어낸 이름)
     const tastes = {
@@ -185,6 +187,7 @@
       u_s20: [['돈까스', '카레'], ['학생식당 2층 - 카레 데이 추천']],
       u_s21: [['브런치', '케이크'], ['한대앞 브런치 카페 - 팬케이크']],
       u_s22: [['짜장면', '탕수육'], ['정문 중국집 - 탕수육 소 사이즈로 둘이 딱']],
+      u_s23: [['국밥', '돈까스', '마라탕'], ['정문 앞 국밥집 - 수업 끝나고 든든하게', '학생식당 2층 - 돈까스 나오는 날 강추']],
     };
     profiles.forEach((p) => {
       const [foods, spots] = tastes[p.userId] || [[], []];
