@@ -1,6 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v1';
+  const KEY = 'bapyak-db-v2';
+  const DB_VERSION = 2;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -9,7 +10,20 @@
     { id: 'lunch', label: '점심', time: '11–14시' },
     { id: 'dinner', label: '저녁', time: '17–20시' },
   ];
-  const DEPTS = ['컴퓨터공학과', '경영학과', '심리학과', '기계공학과', '디자인학과', '국어국문학과'];
+  // 한양대학교 ERICA 단과대학·학과 (출처: studyerica.hanyang.ac.kr 학과안내, 2026년 기준)
+  const COLLEGES = [
+    { name: '공학대학', depts: ['건축학부', '건설환경공학과', '교통∙물류공학과', '전자공학부', '재료화학공학과', '기계공학과', '산업경영공학과', '생명나노공학과', '로봇공학과'] },
+    { name: '소프트웨어융합대학', depts: ['컴퓨터학부', '인공지능학과', 'ICT융합학부'] },
+    { name: '과학기술융합대학', depts: ['수리데이터사이언스학과', '응용물리학과', '의약생명과학과', '화학분자공학과', '해양융합공학과', '나노광전자학과'] },
+    { name: '국제문화대학', depts: ['한국언어문학과', '문화콘텐츠학과', '문화인류학과', '중국학과', '일본학과', '영미언어문화학과', '프랑스학과'] },
+    { name: '언론정보대학', depts: ['광고홍보학과', '정보사회미디어학과'] },
+    { name: '경상대학', depts: ['경영학부', '경제학부'] },
+    { name: '디자인대학', depts: ['주얼리패션디자인학과', '산업디자인학과', '커뮤니케이션디자인학과', '영상디자인학과'] },
+    { name: '예체능대학', depts: ['스포츠과학부', '무용예술학과', '실용음악학과'] },
+    { name: '약학대학', depts: ['약학과'] },
+  ];
+  const DEPTS = COLLEGES.flatMap((c) => c.depts);
+  const collegeOf = (dept) => (COLLEGES.find((c) => c.depts.includes(dept)) || {}).name || '';
   const MAX_PENDING_PER_SENIOR = 5; // 선배 한 명이 받을 수 있는 대기 중 신청 수
   const EXPIRE_DAYS = 7; // 응답이 없으면 자동 만료
   const BIO_MAX = 300;
@@ -55,20 +69,20 @@
       id, username, name, dept, year, contact, pwHash: null, createdAt: now,
     });
     const users = [
-      user('u_s1', 'demo_senior', '김민준', '컴퓨터공학과', '20', '카카오톡 오픈채팅 "민준 선배와 밥약"'),
-      user('u_s2', 'seoyeon', '이서연', '경영학과', '21', '인스타그램 @seoyeon.demo'),
-      user('u_s3', 'jiho', '박지호', '심리학과', '19', '카카오톡 오픈채팅 "지호 선배"'),
+      user('u_s1', 'demo_senior', '김민준', '컴퓨터학부', '20', '카카오톡 오픈채팅 "민준 선배와 밥약"'),
+      user('u_s2', 'seoyeon', '이서연', '경영학부', '21', '인스타그램 @seoyeon.demo'),
+      user('u_s3', 'jiho', '박지호', '문화인류학과', '19', '카카오톡 오픈채팅 "지호 선배"'),
       user('u_s4', 'yujin', '최유진', '기계공학과', '21', '카카오톡 ID yujin_demo'),
-      user('u_s5', 'haneul', '정하늘', '디자인학과', '20', '인스타그램 @haneul.design'),
-      user('u_s6', 'doyoon', '강도윤', '컴퓨터공학과', '22', '카카오톡 ID doyoon_dev'),
-      user('u_j1', 'demo_junior', '조새내', '컴퓨터공학과', '25', '카카오톡 ID saenae_25'),
-      user('u_j2', 'yerin', '한예린', '경영학과', '25', '인스타그램 @yerin.25'),
+      user('u_s5', 'haneul', '정하늘', '산업디자인학과', '20', '인스타그램 @haneul.design'),
+      user('u_s6', 'doyoon', '강도윤', '컴퓨터학부', '22', '카카오톡 ID doyoon_dev'),
+      user('u_j1', 'demo_junior', '조새내', '컴퓨터학부', '25', '카카오톡 ID saenae_25'),
+      user('u_j2', 'yerin', '한예린', '경영학부', '25', '인스타그램 @yerin.25'),
     ];
     const profile = (userId, bio, days, slots) => ({ userId, bio, days, slots, isPublic: true });
     const profiles = [
       profile('u_s1', '백엔드 개발 동아리 운영진이에요. 전공 공부, 동아리, 인턴 준비까지 편하게 물어보세요!', ['월', '수', '금'], ['lunch', 'dinner']),
       profile('u_s2', '마케팅 공모전을 여러 번 나갔어요. 학교 앞 맛집은 제가 제일 잘 압니다.', ['화', '목'], ['lunch']),
-      profile('u_s3', '심리학과 4학년, 대학원 진학 준비 중이에요. 진로 고민 같이 나눠요.', ['월', '화', '수'], ['dinner']),
+      profile('u_s3', '문화인류학과 4학년, 대학원 진학 준비 중이에요. 진로 고민 같이 나눠요.', ['월', '화', '수'], ['dinner']),
       profile('u_s4', '자동차 동아리 활동 중! 전공 과목 선택 팁 알려드릴게요.', ['수', '목', '금'], ['breakfast', 'lunch']),
       profile('u_s5', '졸업 전시 준비 중이에요. 포트폴리오나 디자인 툴 얘기 좋아해요.', ['목', '금'], ['lunch', 'dinner']),
       profile('u_s6', '알고리즘 스터디장이에요. 코딩테스트, 복수전공 고민 상담 환영!', ['월', '화', '목'], ['lunch']),
@@ -77,7 +91,7 @@
       {
         id: 'r_seed1', fromId: 'u_j2', toId: 'u_s1',
         options: [{ date: plusDays(2), slot: 'lunch' }, { date: plusDays(4), slot: 'dinner' }],
-        message: '안녕하세요 선배님! 컴공 전과를 고민 중인데 이야기 들어보고 싶어요.',
+        message: '안녕하세요 선배님! 컴퓨터학부 복수전공을 고민 중인데 이야기 들어보고 싶어요.',
         status: 'pending', chosen: null, createdAt: now - DAY_MS, respondedAt: null,
       },
       {
@@ -89,7 +103,7 @@
       {
         id: 'r_seed3', fromId: 'u_j1', toId: 'u_s3',
         options: [{ date: plusDays(3), slot: 'dinner' }, { date: plusDays(5), slot: 'dinner' }],
-        message: '심리학 교양을 듣고 관심이 생겼어요.',
+        message: '문화인류학 교양을 듣고 관심이 생겼어요.',
         status: 'pending', chosen: null, createdAt: now - 2 * DAY_MS, respondedAt: null,
       },
     ];
@@ -97,7 +111,7 @@
       { id: 'n_seed1', userId: 'u_s1', text: '한예린님이 밥약을 신청했어요.', link: '#/my?tab=received', read: false, createdAt: now - DAY_MS },
       { id: 'n_seed2', userId: 'u_j1', text: '이서연님이 밥약을 수락했어요. 연락처를 확인해 보세요.', link: '#/my?tab=sent', read: false, createdAt: now - DAY_MS },
     ];
-    return { version: 1, users, profiles, requests, notifications, reports: [], blocks: [], session: null };
+    return { version: DB_VERSION, users, profiles, requests, notifications, reports: [], blocks: [], session: null };
   }
 
   function load() {
@@ -106,7 +120,7 @@
     } catch (e) {
       db = null;
     }
-    if (!db || db.version !== 1) {
+    if (!db || db.version !== DB_VERSION) {
       db = seed();
       save();
     }
@@ -130,6 +144,7 @@
     if (db.users.some((u) => u.username === username)) return '이미 사용 중인 아이디예요.';
     if (password.length < 4) return '비밀번호는 4자 이상이어야 해요.';
     if (!name.trim()) return '이름을 입력해 주세요.';
+    if (!DEPTS.includes(dept)) return '학과를 선택해 주세요.';
     if (!/^\d{2}$/.test(year)) return '학번은 입학년도 두 자리로 입력해 주세요. (예: 25)';
     const u = {
       id: uid('u'), username, name: name.trim(), dept, year, contact: contact.trim(),
@@ -318,7 +333,7 @@
   load();
 
   window.Store = {
-    DAYS, SLOTS, DEPTS, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    DAYS, SLOTS, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,

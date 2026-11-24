@@ -34,6 +34,19 @@
   const badge = (status) => `<span class="badge badge-${STATUS[status][1]}">${STATUS[status][0]}</span>`;
   const chips = (items) => items.map((t) => `<span class="chip">${esc(t)}</span>`).join('');
   const userLine = (u) => `${esc(u.dept)} · ${esc(u.year)}학번`;
+
+  // 단과대학별로 묶은 학과 선택 상자
+  function deptSelect(current) {
+    const known = S.DEPTS.includes(current);
+    const groups = S.COLLEGES.map(
+      (c) => `<optgroup label="${esc(c.name)}">${c.depts
+        .map((d) => `<option value="${esc(d)}" ${d === current ? 'selected' : ''}>${esc(d)}</option>`)
+        .join('')}</optgroup>`
+    ).join('');
+    const placeholder = `<option value="" disabled ${current ? '' : 'selected'}>학과를 선택하세요</option>`;
+    const legacy = current && !known ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '';
+    return `<select name="dept" required>${placeholder}${legacy}${groups}</select>`;
+  }
   const initial = (u) => `<div class="avatar" aria-hidden="true">${esc(u.name.slice(0, 1))}</div>`;
 
   function toast(msg) {
@@ -251,9 +264,6 @@
   function viewProfile() {
     const me = S.currentUser();
     const p = S.getProfile(me.id) || { bio: '', days: [], slots: [], isPublic: false };
-    const deptOpts = S.DEPTS.concat(S.DEPTS.includes(me.dept) ? [] : [me.dept])
-      .map((d) => `<option ${d === me.dept ? 'selected' : ''}>${esc(d)}</option>`)
-      .join('');
     const check = (name, value, label, on) =>
       `<label class="check"><input type="checkbox" name="${name}" value="${esc(value)}" ${on ? 'checked' : ''}> ${esc(label)}</label>`;
     return `
@@ -263,7 +273,7 @@
         <form data-form="user" class="stack">
           <label>이름<input name="name" value="${esc(me.name)}" required></label>
           <div class="inline two">
-            <label>학과<select name="dept">${deptOpts}</select></label>
+            <label>학과${deptSelect(me.dept)}</label>
             <label>학번 (입학년도 두 자리)<input name="year" value="${esc(me.year)}" inputmode="numeric" maxlength="2" required></label>
           </div>
           <label>연락처 <span class="sub">(밥약이 수락된 상대에게만 보여요)</span><input name="contact" value="${esc(me.contact)}" placeholder="예: 카카오톡 오픈채팅 링크, 인스타그램 ID"></label>
@@ -330,7 +340,7 @@
           <label>비밀번호 <span class="sub">(4자 이상)</span><input name="password" type="password" autocomplete="new-password" required></label>
           <label>이름<input name="name" required></label>
           <div class="inline two">
-            <label>학과<select name="dept">${S.DEPTS.map((d) => `<option>${esc(d)}</option>`).join('')}</select></label>
+            <label>학과${deptSelect('')}</label>
             <label>학번<input name="year" placeholder="25" inputmode="numeric" maxlength="2" required></label>
           </div>
           <label>연락처 <span class="sub">(수락된 상대에게만 공개)</span><input name="contact" placeholder="예: 카카오톡 오픈채팅 링크"></label>
