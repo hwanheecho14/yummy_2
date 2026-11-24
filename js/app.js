@@ -415,7 +415,7 @@
             <label>학과${deptSelect(me.dept)}</label>
             <label>학번 (입학년도 두 자리)<input name="year" value="${esc(me.year)}" inputmode="numeric" maxlength="2" required></label>
           </div>
-          <label>연락처 <span class="sub">(밥약이 수락된 상대에게만 보여요)</span><input name="contact" value="${esc(me.contact)}" placeholder="예: 카카오톡 오픈채팅 링크, 인스타그램 ID"></label>
+          <label>연락처 <span class="sub">(밥약이 수락된 상대에게만 보여요)</span><input name="contact" value="${esc(me.contact)}" placeholder="예: 카카오톡 오픈채팅 링크 또는 인스타그램 @아이디"></label>
           <button class="btn" type="submit">기본 정보 저장</button>
         </form>
       </section>
@@ -482,7 +482,7 @@
             <label>학과${deptSelect('')}</label>
             <label>학번<input name="year" placeholder="25" inputmode="numeric" maxlength="2" required></label>
           </div>
-          <label>연락처 <span class="sub">(수락된 상대에게만 공개)</span><input name="contact" placeholder="예: 카카오톡 오픈채팅 링크"></label>
+          <label>연락처 <span class="sub">(수락된 상대에게만 공개)</span><input name="contact" placeholder="예: 카카오톡 오픈채팅 링크 또는 인스타그램 @아이디"></label>
           <button class="btn" type="submit">가입하기</button>
           <p class="note">데이터는 이 브라우저에만 저장돼요. 실제 비밀번호는 쓰지 마세요.</p>
         </form>
