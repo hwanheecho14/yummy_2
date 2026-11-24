@@ -3,7 +3,7 @@
   const S = window.Store;
   const app = document.getElementById('app');
   const nav = document.getElementById('nav');
-  const filters = { q: '', dept: '', day: '', slot: '' };
+  const filters = { q: '', dept: '', day: '', slot: '', kind: 'senior' }; // kind: 'senior' | 'buddy'
 
   // ---------- 도우미 ----------
   const esc = (s) =>
@@ -102,12 +102,12 @@
     const link = (href, label, key, count) =>
       `<a href="${href}" class="${active === key ? 'active' : ''}">${label}${count ? `<span class="count">${count}</span>` : ''}</a>`;
     if (!me) {
-      nav.innerHTML = link('#/', '선배 찾기', 'list') + link('#/event', '☕ 이벤트', 'event') + link('#/login', '로그인', 'login');
+      nav.innerHTML = link('#/', '밥약 찾기', 'list') + link('#/event', '☕ 이벤트', 'event') + link('#/login', '로그인', 'login');
       return;
     }
     const pendingReceived = S.requestsOf(me.id).received.filter((r) => r.status === 'pending').length;
     nav.innerHTML =
-      link('#/', '선배 찾기', 'list') +
+      link('#/', '밥약 찾기', 'list') +
       link('#/event', '☕ 이벤트', 'event') +
       link('#/my', '내 밥약', 'my', pendingReceived) +
       link('#/notifications', '알림', 'notifications', S.unreadCount(me.id)) +
@@ -117,7 +117,7 @@
 
   // ---------- 선배 목록 ----------
   function viewList() {
-    const seniors = S.publicSeniors();
+    const seniors = S.publicSeniors(filters.kind);
     const depts = [...new Set(seniors.map((s) => s.user.dept))].sort();
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(label)}</option>`;
     const me = S.currentUser();
@@ -133,6 +133,7 @@
         </div>
       </section>
       ${eventBanner()}
+      ${kindTabs()}
       <section class="filters" aria-label="검색 필터">
         <input type="search" id="f-q" placeholder="이름, 학과, 소개로 검색" value="${esc(filters.q)}" aria-label="검색어">
         <select id="f-dept" aria-label="학과">${opt('', '전체 학과', filters.dept)}${depts.map((d) => opt(d, d, filters.dept)).join('')}</select>
@@ -146,7 +147,7 @@
     const box = document.getElementById('results');
     if (!box) return;
     const q = filters.q.trim().toLowerCase();
-    const list = S.publicSeniors().filter(({ user, profile }) => {
+    const list = S.publicSeniors(filters.kind).filter(({ user, profile }) => {
       if (filters.dept && user.dept !== filters.dept) return false;
       if (filters.day && !S.availDays(profile).includes(filters.day)) return false;
       if (filters.slot && !(filters.day ? S.windowsOn(profile, filters.day).includes(filters.slot) : S.hasWindow(profile, filters.slot))) return false;
@@ -154,7 +155,7 @@
       return true;
     });
     if (!list.length) {
-      box.innerHTML = '<p class="empty">조건에 맞는 선배가 없어요. 필터를 바꿔 보세요.</p>';
+      box.innerHTML = `<p class="empty">조건에 맞는 ${S.KINDS[filters.kind]}가 없어요. 필터를 바꿔 보세요.</p>`;
       return;
     }
     const me = S.currentUser();
@@ -176,10 +177,13 @@
            </section>`
         : '';
 
+    const noun = S.KINDS[filters.kind]; // '선배' 또는 '밥친구'
+    const sameDeptDesc =
+      filters.kind === 'buddy' ? '같은 과 친구라 수업 이야기로 금방 친해질 수 있어요.' : '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.';
     if (!me) {
       box.innerHTML =
-        '<p class="note login-hint">로그인하면 우리 학과·단과대 선배를 먼저 모아서 보여드려요.</p>' +
-        section('🍚 전체 선배', '', list, '', '');
+        `<p class="note login-hint">로그인하면 우리 학과·단과대 ${noun}를 먼저 모아서 보여드려요.</p>` +
+        section(`🍚 전체 ${noun}`, '', list, '', '');
       return;
     }
     const myCollege = S.collegeOf(me.dept);
@@ -187,9 +191,21 @@
     const sameCollege = list.filter((x) => x.user.dept !== me.dept && myCollege && S.collegeOf(x.user.dept) === myCollege);
     const others = list.filter((x) => !sameDept.includes(x) && !sameCollege.includes(x));
     box.innerHTML =
-      section(`🍽️ 우리 학과 선배 · ${me.dept}`, '같은 학과 선배라 전공 이야기를 바로 나눌 수 있어요.', sameDept, '같은 학과', 'featured') +
-      section(`🥢 같은 단과대 선배 · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
-      section(sameDept.length || sameCollege.length ? '🍚 다른 학과 선배' : '🍚 전체 선배', '', others, '', '');
+      section(`🍽️ 우리 학과 ${noun} · ${me.dept}`, sameDeptDesc, sameDept, '같은 학과', 'featured') +
+      section(`🥢 같은 단과대 ${noun} · ${myCollege}`, '', sameCollege, '같은 단과대', 'featured') +
+      section(sameDept.length || sameCollege.length ? `🍚 다른 학과 ${noun}` : `🍚 전체 ${noun}`, '', others, '', '');
+  }
+
+  // 홈 상단 탭: 선배에게 밥약 / 같이 먹을 밥친구
+  function kindTabs() {
+    const tab = (kind, label, desc) => `
+      <button type="button" role="tab" class="kind-tab ${filters.kind === kind ? 'active' : ''}" aria-selected="${filters.kind === kind}" data-action="kind" data-kind="${kind}">
+        <strong>${label}</strong><span>${desc}</span>
+      </button>`;
+    return `<div class="kind-tabs" role="tablist" aria-label="찾을 상대">
+      ${tab('senior', '🧑‍🏫 선배 찾기', '선배에게 밥약 신청')}
+      ${tab('buddy', '🍚 밥친구 찾기', '학년 상관없이 같이 먹을 친구')}
+    </div>`;
   }
 
   // ---------- 선배 상세 + 신청 ----------
@@ -221,7 +237,7 @@
            </div>`
         : '';
     return `
-      <a class="back" href="#/">← 선배 목록</a>
+      <a class="back" href="#/">← 목록으로</a>
       <article class="card">
         <div class="card-head big">${initial(user)}<div><h1>${esc(user.name)}</h1><div class="sub">${userLine(user)}</div></div></div>
         <p class="bio full">${esc(profile.bio)}</p>
@@ -348,13 +364,13 @@
         </div>
       </div>`;
     };
-    if (!dates.length) return '<p class="note">선배가 가능한 요일이 아직 등록되지 않았어요.</p>';
+    if (!dates.length) return '<p class="note">가능한 요일이 아직 등록되지 않았어요.</p>';
     requestForm.dates = dates;
     return `
-      <h2>밥약 신청하기</h2>
-      <p class="sub">선배가 가능한 요일(${esc(S.availDays(profile).join(', '))})의 날짜만 보여요. 날짜를 고르면 그날 가능한 시간이 나와요. 후보는 최대 3개까지 넣을 수 있어요.</p>
+      <h2>${S.kindOf(profile) === 'buddy' ? '밥친구 신청하기' : '밥약 신청하기'}</h2>
+      <p class="sub">가능한 요일(${esc(S.availDays(profile).join(', '))})의 날짜만 보여요. 날짜를 고르면 그날 가능한 시간이 나와요. 후보는 최대 3개까지 넣을 수 있어요.</p>
       ${S.supportsEvent(profile)
-        ? '<p class="event-note">☕ 이 선배는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>'
+        ? `<p class="event-note">☕ 이 ${S.KINDS[S.kindOf(profile)]}는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>`
         : ''}
       <form data-form="request" data-id="${esc(id)}" class="stack">
         ${row(0)}${row(1)}${row(2)}
@@ -592,10 +608,16 @@
         </form>
       </section>
       <section class="card">
-        <h2>선배 프로필</h2>
-        <p class="sub">공개하면 후배들이 목록에서 보고 밥약을 신청할 수 있어요.</p>
+        <h2>내 밥약 프로필</h2>
+        <p class="sub">공개하면 다른 학생들이 목록에서 보고 신청할 수 있어요. 새내기도 밥친구 프로필을 만들 수 있어요.</p>
         <form data-form="senior" class="stack">
-          <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 선배 프로필 공개하기</label>
+          <fieldset><legend>어떤 프로필인가요?</legend>
+            <div class="checks">
+              <label class="radio"><input type="radio" name="kind" value="senior" ${S.kindOf(p) === 'senior' ? 'checked' : ''}> 🧑‍🏫 선배로 후배 밥약 받기</label>
+              <label class="radio"><input type="radio" name="kind" value="buddy" ${S.kindOf(p) === 'buddy' ? 'checked' : ''}> 🍚 같이 먹을 밥친구 찾기</label>
+            </div>
+          </fieldset>
+          <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 목록에 프로필 공개하기</label>
           <label>자기소개 (${S.BIO_MAX}자 이내)<textarea name="bio" rows="4" maxlength="${S.BIO_MAX}" placeholder="전공, 동아리, 나눌 수 있는 이야기를 적어 주세요.">${esc(p.bio)}</textarea></label>
           <label>🍴 좋아하는 메뉴 <span class="sub">(쉼표로 구분, ${S.FOODS_MAX}개까지)</span>
             <input name="foods" value="${esc((p.foods || []).join(', '))}" placeholder="예: 돈까스, 마라탕, 쌀국수"></label>
@@ -607,7 +629,7 @@
             <div class="avail-rows">${(p.avail || []).map(availRow).join('')}</div>
             <button type="button" class="btn ghost small" data-action="add-range">+ 시간 추가</button>
           </fieldset>
-          <button class="btn" type="submit">선배 프로필 저장</button>
+          <button class="btn" type="submit">밥약 프로필 저장</button>
         </form>
       </section>
       <p class="quiet center"><button type="button" class="link-btn" data-action="reset">데모 데이터 초기화</button></p>`;
@@ -710,7 +732,7 @@
   }
 
   // ---------- 이벤트 ----------
-  // 시간표 이미지 선택 → 줄여서 미리보기, 저장은 '선배 프로필 저장'을 눌러야 됨
+  // 시간표 이미지 선택 → 줄여서 미리보기, 저장은 '밥약 프로필 저장'을 눌러야 됨
   document.addEventListener('change', async (e) => {
     if (e.target.dataset.actionChange !== 'tt-image' || !e.target.files[0]) return;
     const box = e.target.closest('.tt-image');
@@ -765,6 +787,12 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    if (action === 'kind') {
+      filters.kind = el.dataset.kind;
+      filters.dept = '';
+      route();
+      return;
+    }
     // 가능 시간 편집: 화면에서만 줄을 늘리고 줄이며, 저장 버튼을 눌러야 반영됨
     if (action === 'add-range') {
       el.previousElementSibling.insertAdjacentHTML('beforeend', availRow({ day: '월', start: 11, end: 13 }));
@@ -903,13 +931,14 @@
       case 'senior':
         err = S.saveProfile({
           bio: d.bio || '',
+          kind: d.kind || 'senior',
           foods: S.parseFoods(d.foods),
           spots: S.parseSpots(d.spots),
           avail: asArray(d.aday).map((day, i) => ({ day, start: Number(asArray(d.astart)[i]), end: Number(asArray(d.aend)[i]) })),
           isPublic: 'isPublic' in d,
           timetable: { classes: classesFromGrid(form), image: d.ttimage || null },
         });
-        if (!err) toast('선배 프로필을 저장했어요.');
+        if (!err) toast('밥약 프로필을 저장했어요.');
         break;
     }
     if (err) toast(err);

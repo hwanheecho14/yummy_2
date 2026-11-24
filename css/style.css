@@ -240,6 +240,25 @@ h2 { font-size: 1.3rem; margin: 0 0 8px; }
   transform: rotate(3deg);
   box-shadow: 0 2px 0 var(--primary-deep);
 }
+.kind-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.kind-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.kind-tab strong { font-family: var(--font-title); font-weight: 400; font-size: 1.15rem; }
+.kind-tab span { font-size: 0.82rem; color: var(--muted); }
+.kind-tab:hover { transform: translateY(-2px); }
+.kind-tab.active { border-color: var(--primary); background: var(--primary-soft); }
 .senior-section { margin-bottom: 28px; }
 .senior-section h2 { margin-bottom: 4px; }
 .senior-section > .sub { margin: 0 0 12px; }
