@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v7';
-  const DB_VERSION = 7;
+  const KEY = 'bapyak-db-v8';
+  const DB_VERSION = 8;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -161,6 +161,35 @@
       profile('u_s21', '모션그래픽 외주 경험 있어요. 영상 툴 배우는 순서 같이 정해봐요.', ['수', '목'], ['lunch', 'dinner']),
       profile('u_s22', '배터리 소재 연구실 학부연구생이에요. 연구실 컨택 방법 알려드릴게요.', ['화', '수', '금'], ['lunch']),
     ];
+    // 좋아하는 메뉴와 추천 맛집 (예시라 가게 이름은 지어낸 이름)
+    const tastes = {
+      u_s1: [['돈까스', '마라탕', '쌀국수'], ['학교 앞 돈까스집 - 치즈돈까스가 진짜 맛있어요', '학생식당 2층 - 금요일 특식 추천']],
+      u_s2: [['떡볶이', '파스타'], ['한대앞역 파스타집 - 크림 파스타 강추']],
+      u_s3: [['국밥', '김치찌개'], ['정문 앞 국밥집 - 든든한 순대국밥']],
+      u_s4: [['햄버거', '샐러드'], ['후문 수제버거 - 감자튀김이 바삭해요']],
+      u_s5: [['초밥', '우동'], ['학교 앞 초밥집 - 점심 세트가 가성비 최고']],
+      u_s6: [['라멘', '덮밥'], ['한대앞 라멘집 - 돈코츠 라멘']],
+      u_s7: [['샌드위치', '커피'], ['학교 카페 - 아침 샌드위치 세트']],
+      u_s8: [['피자', '치킨'], []],
+      u_s9: [['마라탕', '탕후루'], ['후문 마라탕집 - 2단계 맵기 추천']],
+      u_s10: [['제육볶음', '라면'], ['학생식당 1층 - 제육볶음 나오는 날은 꼭']],
+      u_s11: [['비빔밥', '칼국수'], []],
+      u_s12: [['햄버거', '돈까스'], ['후문 수제버거 - 더블패티']],
+      u_s13: [['쌀국수', '분짜'], ['학교 앞 베트남 식당 - 분짜 맛집']],
+      u_s14: [['삼겹살', '냉면'], ['한대앞 고깃집 - 저녁 밥약은 여기']],
+      u_s15: [['떡볶이', '김밥'], ['정문 분식집 - 떡튀순 세트']],
+      u_s16: [['부대찌개', '김치볶음밥'], []],
+      u_s17: [['오코노미야키', '우동'], ['한대앞 일식 주점 - 점심엔 우동 정식']],
+      u_s18: [['닭가슴살 샐러드', '포케'], ['학교 앞 포케집 - 운동 끝나고 딱']],
+      u_s19: [['파스타', '리조또'], []],
+      u_s20: [['돈까스', '카레'], ['학생식당 2층 - 카레 데이 추천']],
+      u_s21: [['브런치', '케이크'], ['한대앞 브런치 카페 - 팬케이크']],
+      u_s22: [['짜장면', '탕수육'], ['정문 중국집 - 탕수육 소 사이즈로 둘이 딱']],
+    };
+    profiles.forEach((p) => {
+      const [foods, spots] = tastes[p.userId] || [[], []];
+      Object.assign(p, { foods, spots });
+    });
     const requests = [
       {
         id: 'r_seed1', fromId: 'u_j2', toId: 'u_s1',
@@ -288,7 +317,13 @@
     return out;
   }
 
-  function saveProfile({ bio, avail, isPublic, timetable }) {
+  // 좋아하는 메뉴는 쉼표로 구분한 최대 5개, 추천 맛집은 줄마다 하나씩 최대 3곳
+  const FOODS_MAX = 5;
+  const SPOTS_MAX = 3;
+  const parseFoods = (text) => [...new Set(String(text || '').split(/[,，\n]/).map((s) => s.trim()).filter(Boolean))];
+  const parseSpots = (text) => String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+
+  function saveProfile({ bio, avail, isPublic, timetable, foods = [], spots = [] }) {
     const u = currentUser();
     if (!u) return '로그인이 필요해요.';
     if (bio.length > BIO_MAX) return `자기소개는 ${BIO_MAX}자 이내로 써 주세요.`;
@@ -300,6 +335,10 @@
       }
     }
     if (isPublic && !avail.length) return '공개하려면 가능한 시간을 하나 이상 추가해 주세요.';
+    if (foods.length > FOODS_MAX) return `좋아하는 메뉴는 ${FOODS_MAX}개까지 적어 주세요.`;
+    if (foods.some((f) => f.length > 15)) return '메뉴 이름은 15자 이내로 적어 주세요.';
+    if (spots.length > SPOTS_MAX) return `추천 맛집은 ${SPOTS_MAX}곳까지 적어 주세요.`;
+    if (spots.some((s) => s.length > 60)) return '맛집 한 줄은 60자 이내로 적어 주세요.';
     if (timetable && timetable.image && timetable.image.length > IMAGE_MAX_CHARS) return '시간표 이미지가 너무 커요. 더 작은 이미지를 올려 주세요.';
     let p = getProfile(u.id);
     if (!p) {
@@ -312,6 +351,8 @@
       avail: mergeRanges(avail),
       isPublic,
       timetable: timetable ? { classes: mergeRanges(timetable.classes || []), image: timetable.image || null } : p.timetable || null,
+      foods,
+      spots,
     });
     if (!save()) {
       Object.assign(p, JSON.parse(before)); // 저장 공간이 부족하면 되돌림
@@ -517,7 +558,7 @@
   load();
 
   window.Store = {
-    DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
