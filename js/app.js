@@ -96,6 +96,45 @@
     toast.t = setTimeout(() => el.classList.remove('show'), 2400);
   }
 
+  // 화면 안 확인창 (브라우저 confirm/prompt 대신. 공유 링크로 열 때 기본 팝업이 막혀 있어도 동작)
+  // input을 주면 글 입력칸이 생기고 입력값을, 아니면 true를 돌려줌. 취소하면 false
+  function ask({ message, ok = '확인', input = '', danger = false }) {
+    return new Promise((resolve) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'ask-backdrop';
+      wrap.innerHTML = `
+        <div class="ask" role="dialog" aria-modal="true" aria-labelledby="ask-msg">
+          <p id="ask-msg">${esc(message)}</p>
+          ${input ? `<textarea id="ask-input" rows="3" maxlength="200" placeholder="${esc(input)}"></textarea>` : ''}
+          <div class="ask-actions">
+            <button type="button" class="btn ghost" data-ask="no">닫기</button>
+            <button type="button" class="btn ${danger ? 'danger' : ''}" data-ask="yes">${esc(ok)}</button>
+          </div>
+        </div>`;
+      const close = (value) => {
+        wrap.remove();
+        document.removeEventListener('keydown', onKey);
+        resolve(value);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') close(false);
+      };
+      wrap.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-ask]');
+        if (e.target === wrap || (b && b.dataset.ask === 'no')) return close(false);
+        if (b && b.dataset.ask === 'yes') {
+          if (!input) return close(true);
+          const v = wrap.querySelector('#ask-input').value.trim();
+          if (!v) return wrap.querySelector('#ask-input').focus();
+          close(v);
+        }
+      });
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(wrap);
+      (wrap.querySelector('#ask-input') || wrap.querySelector('[data-ask="yes"]')).focus();
+    });
+  }
+
   function go(hash) {
     if (location.hash === hash) route();
     else location.hash = hash;
@@ -1118,7 +1157,7 @@
     }
   });
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
@@ -1150,7 +1189,7 @@
     if (action === 'leave-meetup') {
       const m = S.meetupById(id);
       const host = m && m.hostId === S.currentUser()?.id;
-      if (!confirm(host ? '모집을 취소할까요? 참여한 멤버에게 알림이 가요.' : '참여를 취소할까요?')) return;
+      if (!(await ask({ message: host ? '모집을 취소할까요? 참여한 멤버에게 알림이 가요.' : '참여를 취소할까요?', ok: host ? '모집 취소' : '참여 취소', danger: true }))) return;
       const err = S.leaveMeetup(id);
       toast(err || (host ? '모집을 취소했어요.' : '참여를 취소했어요.'));
       return route();
@@ -1227,30 +1266,30 @@
         go(next || '#/');
         return;
       case 'reject':
-        if (!confirm('이 신청을 거절할까요?')) return;
+        if (!(await ask({ message: '이 신청을 거절할까요?', ok: '거절하기', danger: true }))) return;
         err = S.respond(id, false);
         if (!err) toast('신청을 거절했어요.');
         break;
       case 'cancel':
-        if (!confirm('신청을 취소할까요?')) return;
+        if (!(await ask({ message: '신청을 취소할까요?', ok: '신청 취소', danger: true }))) return;
         err = S.cancel(id);
         if (!err) toast('신청을 취소했어요.');
         break;
       case 'report': {
-        const reason = prompt('신고 사유를 적어 주세요.');
-        if (!reason || !reason.trim()) return;
+        const reason = await ask({ message: '신고 사유를 적어 주세요.', input: '예: 약속 장소에 나오지 않았어요', ok: '신고하기', danger: true });
+        if (!reason || !String(reason).trim()) return;
         S.report(id, reason);
         toast('신고가 접수됐어요.');
         return;
       }
       case 'block':
-        if (!confirm('차단하면 서로의 목록에서 보이지 않고, 진행 중인 신청은 취소돼요. 차단할까요?')) return;
+        if (!(await ask({ message: '차단하면 서로의 목록에서 보이지 않고, 진행 중인 신청은 취소돼요. 차단할까요?', ok: '차단하기', danger: true }))) return;
         S.block(id);
         toast('차단했어요.');
         go('#/');
         return;
       case 'reset':
-        if (!confirm('모든 데이터를 처음 상태로 되돌릴까요? 가입한 계정과 신청 내역이 지워져요.')) return;
+        if (!(await ask({ message: '모든 데이터를 처음 상태로 되돌릴까요? 가입한 계정과 신청 내역이 지워져요.', ok: '초기화', danger: true }))) return;
         S.reset();
         toast('데모 데이터를 초기화했어요.');
         go('#/');
