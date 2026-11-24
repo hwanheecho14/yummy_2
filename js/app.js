@@ -10,7 +10,11 @@
     String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const slotOf = (id) => S.SLOTS.find((s) => s.id === id);
   const slotText = (id) => (slotOf(id) ? slotOf(id).label : id);
-  const sortSlots = (ids) => S.SLOTS.filter((s) => ids.includes(s.id)).map((s) => s.id);
+  // 가능 시간: 같은 요일의 겹치는 구간은 합쳐서 '수 11:00~15:00' 칩 하나로 보여줌
+  const availChips = (profile) =>
+    S.mergeRanges(profile.avail)
+      .map((a) => `<span class="chip time"><b>${esc(a.day)}</b> ${a.start}:00~${a.end}:00</span>`)
+      .join('');
 
   function fmtDate(iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -132,8 +136,8 @@
     const q = filters.q.trim().toLowerCase();
     const list = S.publicSeniors().filter(({ user, profile }) => {
       if (filters.dept && user.dept !== filters.dept) return false;
-      if (filters.day && !profile.days.includes(filters.day)) return false;
-      if (filters.slot && !profile.slots.includes(filters.slot)) return false;
+      if (filters.day && !S.availDays(profile).includes(filters.day)) return false;
+      if (filters.slot && !(filters.day ? S.windowsOn(profile, filters.day).includes(filters.slot) : S.hasWindow(profile, filters.slot))) return false;
       if (q && ![user.name, user.dept, profile.bio].join(' ').toLowerCase().includes(q)) return false;
       return true;
     });
@@ -147,7 +151,7 @@
           ${tag ? `<span class="tag">${esc(tag)}</span>` : ''}
           <div class="card-head">${initial(user)}<div><strong>${esc(user.name)}</strong><div class="sub">${userLine(user)}</div></div></div>
           <p class="bio">${esc(profile.bio)}</p>
-          <div class="chips">${chips(profile.days, 'day')}${chips(sortSlots(profile.slots).map(slotText))}</div>
+          <div class="chips">${availChips(profile)}</div>
           ${S.supportsEvent(profile) ? '<div class="event-chip">☕ 수요일 공강 밥약 가능</div>' : ''}
         </a>`;
     const section = (title, desc, items, tag, cls) =>
@@ -209,8 +213,7 @@
         <div class="card-head big">${initial(user)}<div><h1>${esc(user.name)}</h1><div class="sub">${userLine(user)}</div></div></div>
         <p class="bio full">${esc(profile.bio)}</p>
         <dl class="facts">
-          <dt>가능한 요일</dt><dd><div class="chips">${chips(profile.days.map((d) => d + '요일'), 'day')}</div></dd>
-          <dt>가능한 시간대</dt><dd><div class="chips">${chips(sortSlots(profile.slots).map(slotText))}</div></dd>
+          <dt>가능한 시간</dt><dd><div class="chips">${availChips(profile)}</div></dd>
         </dl>
         ${safety}
       </article>
@@ -273,7 +276,7 @@
     const out = [];
     const d = new Date(S.today() + 'T00:00:00');
     for (let i = 0; i < 56; i++) {
-      if (profile.days.includes(WEEKDAY[d.getDay()])) {
+      if (S.availDays(profile).includes(WEEKDAY[d.getDay()])) {
         out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
       }
       d.setDate(d.getDate() + 1);
@@ -296,11 +299,21 @@
       .join('');
   }
 
-  function requestForm(id, profile) {
-    const slotOpts = sortSlots(profile.slots)
-      .map((s) => `<option value="${esc(s)}">${esc(slotText(s))}${s === S.EVENT.slot ? ' ☕ 수요일이면 이벤트' : ''}</option>`)
+  // 고른 날짜의 요일에 선배가 가능한 2시간짜리 시간대만 채움
+  function slotOptions(profile, iso) {
+    if (!iso) return '<option value="">시간</option>';
+    const wd = WEEKDAY[new Date(iso + 'T00:00:00').getDay()];
+    return S.windowsOn(profile, wd)
+      .map((s) => {
+        const coffee = S.isEventOption({ date: iso, slot: s }) ? ' ☕ 공강 이벤트' : '';
+        return `<option value="${esc(s)}">${esc(slotText(s))}${coffee}</option>`;
+      })
       .join('');
+  }
+
+  function requestForm(id, profile) {
     const dates = availableDates(profile);
+    requestForm.profile = profile;
     const months = [...new Set(dates.map(monthKey))];
     const row = (i) => {
       const first = i === 0;
@@ -313,7 +326,7 @@
         <div class="date-row">
           <select data-month="${i}" aria-label="희망 월 ${i + 1}">${monthOpts}</select>
           <select name="date${i}" data-day="${i}" aria-label="희망 날짜 ${i + 1}" ${first ? 'required' : 'disabled'}>${dayOptions(dates, first ? months[0] : '')}</select>
-          <select name="slot${i}" aria-label="희망 시간대 ${i + 1}" ${first ? '' : 'disabled'}>${slotOpts}</select>
+          <select name="slot${i}" aria-label="희망 시간대 ${i + 1}" ${first ? '' : 'disabled'}>${slotOptions(profile, first ? dates[0] : '')}</select>
         </div>
       </div>`;
     };
@@ -321,7 +334,7 @@
     requestForm.dates = dates;
     return `
       <h2>밥약 신청하기</h2>
-      <p class="sub">선배가 가능한 요일(${esc(profile.days.join(', '))})의 날짜만 보여요. 월과 일을 눌러 고르고, 후보를 최대 3개까지 넣을 수 있어요.</p>
+      <p class="sub">선배가 가능한 요일(${esc(S.availDays(profile).join(', '))})의 날짜만 보여요. 날짜를 고르면 그날 가능한 시간이 나와요. 후보는 최대 3개까지 넣을 수 있어요.</p>
       ${S.supportsEvent(profile)
         ? '<p class="event-note">☕ 이 선배는 수요일 13:00~15:00 공강 시간에 가능해요. 이 시간으로 확정되면 <a href="#/event">커피 기프티콘 이벤트</a>에 응모돼요!</p>'
         : ''}
@@ -458,10 +471,26 @@
       </section>`;
   }
 
+  // 가능 시간 한 줄: [요일] [시작] ~ [끝] [삭제]
+  function availRow(a) {
+    const hours = (from, to, cur) =>
+      Array.from({ length: to - from + 1 }, (_, i) => from + i)
+        .map((h) => `<option value="${h}" ${h === cur ? 'selected' : ''}>${h}:00</option>`)
+        .join('');
+    return `
+      <div class="avail-row">
+        <select name="aday" aria-label="요일">${S.DAYS.map((d) => `<option ${d === a.day ? 'selected' : ''}>${d}</option>`).join('')}</select>
+        <select name="astart" aria-label="시작 시각">${hours(S.HOUR_MIN, S.HOUR_MAX - S.MIN_RANGE, a.start)}</select>
+        <span aria-hidden="true">~</span>
+        <select name="aend" aria-label="끝 시각">${hours(S.HOUR_MIN + S.MIN_RANGE, S.HOUR_MAX, a.end)}</select>
+        <button type="button" class="link-btn remove" data-action="remove-range" aria-label="이 시간 삭제">✕</button>
+      </div>`;
+  }
+
   // ---------- 내 프로필 ----------
   function viewProfile() {
     const me = S.currentUser();
-    const p = S.getProfile(me.id) || { bio: '', days: [], slots: [], isPublic: false };
+    const p = S.getProfile(me.id) || { bio: '', avail: [], isPublic: false };
     const check = (name, value, label, on) =>
       `<label class="check"><input type="checkbox" name="${name}" value="${esc(value)}" ${on ? 'checked' : ''}> ${esc(label)}</label>`;
     return `
@@ -484,8 +513,11 @@
         <form data-form="senior" class="stack">
           <label class="switch"><input type="checkbox" name="isPublic" ${p.isPublic ? 'checked' : ''}> 선배 프로필 공개하기</label>
           <label>자기소개 (${S.BIO_MAX}자 이내)<textarea name="bio" rows="4" maxlength="${S.BIO_MAX}" placeholder="전공, 동아리, 나눌 수 있는 이야기를 적어 주세요.">${esc(p.bio)}</textarea></label>
-          <fieldset><legend>가능한 요일</legend><div class="checks">${S.DAYS.map((d) => check('days', d, d, p.days.includes(d))).join('')}</div></fieldset>
-          <fieldset><legend>가능한 시간대</legend><div class="checks">${S.SLOTS.map((s) => check('slots', s.id, s.label, p.slots.includes(s.id))).join('')}</div></fieldset>
+          <fieldset class="avail-editor"><legend>가능한 시간</legend>
+            <p class="sub">요일마다 밥약 가능한 시간을 하나씩 따로 추가하세요. 겹치는 시간은 저장할 때 하나로 합쳐져요.</p>
+            <div class="avail-rows">${(p.avail || []).map(availRow).join('')}</div>
+            <button type="button" class="btn ghost small" data-action="add-range">+ 시간 추가</button>
+          </fieldset>
           <button class="btn" type="submit">선배 프로필 저장</button>
         </form>
       </section>
@@ -598,17 +630,22 @@
     box.form.requestSubmit();
   });
 
-  // 신청 폼: 월을 바꾸면 일 선택지를 다시 채우고, '선택 안 함'이면 일·시간대를 끔
+  // 신청 폼: 월을 바꾸면 일 선택지를, 일을 바꾸면 그날 가능한 시간대를 다시 채움.
+  // '선택 안 함'이면 일·시간대를 끔
   document.addEventListener('change', (e) => {
-    const i = e.target.dataset.month;
-    if (i == null) return;
+    const { month: mi, day: di } = e.target.dataset;
+    if (mi == null && di == null) return;
+    const i = mi != null ? mi : di;
     const form = e.target.form;
     const day = form.querySelector(`[data-day="${i}"]`);
     const slot = form.querySelector(`[name="slot${i}"]`);
-    const month = e.target.value;
-    day.innerHTML = dayOptions(requestForm.dates || [], month);
-    day.disabled = !month;
-    slot.disabled = !month;
+    if (mi != null) {
+      const month = e.target.value;
+      day.innerHTML = dayOptions(requestForm.dates || [], month);
+      day.disabled = !month;
+      slot.disabled = !month;
+    }
+    slot.innerHTML = slotOptions(requestForm.profile, day.disabled ? '' : day.value);
   });
 
   document.addEventListener('input', (e) => {
@@ -623,6 +660,15 @@
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const { action, id, next } = el.dataset;
+    // 가능 시간 편집: 화면에서만 줄을 늘리고 줄이며, 저장 버튼을 눌러야 반영됨
+    if (action === 'add-range') {
+      el.previousElementSibling.insertAdjacentHTML('beforeend', availRow({ day: '월', start: 11, end: 13 }));
+      return;
+    }
+    if (action === 'remove-range') {
+      el.closest('.avail-row').remove();
+      return;
+    }
     let err = null;
     switch (action) {
       case 'logout':
@@ -724,7 +770,9 @@
         break;
       case 'senior':
         err = S.saveProfile({
-          bio: d.bio || '', days: asArray(d.days), slots: asArray(d.slots), isPublic: 'isPublic' in d,
+          bio: d.bio || '',
+          avail: asArray(d.aday).map((day, i) => ({ day, start: Number(asArray(d.astart)[i]), end: Number(asArray(d.aend)[i]) })),
+          isPublic: 'isPublic' in d,
         });
         if (!err) toast('선배 프로필을 저장했어요.');
         break;

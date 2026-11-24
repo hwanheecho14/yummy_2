@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v6';
-  const DB_VERSION = 6;
+  const KEY = 'bapyak-db-v7';
+  const DB_VERSION = 7;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -13,6 +13,35 @@
   // 예전 시간대(아침/점심/저녁)를 새 시간대로 바꿀 때 사용
   const LEGACY = { breakfast: ['h8'], lunch: ['h11', 'h12', 'h13'], dinner: ['h17', 'h18'] };
   const expandSlots = (ids) => [...new Set(ids.flatMap((id) => LEGACY[id] || [id]))];
+
+  // ---------- 가능 시간 (요일별 시간 구간) ----------
+  // 선배는 '수 11:00~15:00'처럼 요일마다 가능한 구간을 따로 추가합니다.
+  // 화면에는 겹치는 구간을 합쳐서 보여주고, 신청할 때는 그 안에서 2시간짜리 시간대를 고릅니다.
+  const HOUR_MIN = 8;
+  const HOUR_MAX = 20;
+  const MIN_RANGE = 2;
+
+  // 같은 요일의 겹치거나 맞닿은 구간을 하나로 합침
+  function mergeRanges(avail) {
+    const out = [];
+    DAYS.forEach((day) => {
+      const list = (avail || []).filter((a) => a.day === day).sort((a, b) => a.start - b.start);
+      list.forEach((a) => {
+        const last = out[out.length - 1];
+        if (last && last.day === day && a.start <= last.end) last.end = Math.max(last.end, a.end);
+        else out.push({ day, start: a.start, end: a.end });
+      });
+    });
+    return out;
+  }
+  const availDays = (p) => DAYS.filter((d) => (p.avail || []).some((a) => a.day === d));
+  // 그 요일에 들어가는 2시간짜리 시간대 id 목록 (1시간 간격)
+  const windowsOn = (p, day) =>
+    SLOTS.filter((s) => mergeRanges(p.avail).some((r) => r.day === day && r.start <= s.start && s.start + 2 <= r.end)).map((s) => s.id);
+  const hasWindow = (p, slotId) => DAYS.some((d) => windowsOn(p, d).includes(slotId));
+  // 예전 형식(요일 목록 × 시간대 목록)을 요일별 구간으로 바꿈
+  const rangesFrom = (days, slotIds) =>
+    mergeRanges(days.flatMap((day) => expandSlots(slotIds).map((id) => ({ day, start: Number(id.slice(1)), end: Number(id.slice(1)) + 2 }))));
   // 한양대학교 ERICA 단과대학·학과 (2025학년도 학제 개편 이후 10개 단과대학)
   // 출처: 한양대학교 ERICA 2026학년도 신입학 전형계획 모집단위 (goerica.hanyang.ac.kr/upload/GUIDES/2026_plan_02.pdf)
   //       디자인대학 세부 학과는 모집요강의 '디자인계열'을 학과 단위로 나눈 것
@@ -107,7 +136,7 @@
       user('u_j1', 'demo_junior', '조새내', '컴퓨터학부', '25', '카카오톡 ID saenae_25'),
       user('u_j2', 'yerin', '한예린', '경영학부', '25', '인스타그램 @yerin.25'),
     ];
-    const profile = (userId, bio, days, slots) => ({ userId, bio, days, slots: expandSlots(slots), isPublic: true });
+    const profile = (userId, bio, days, slots) => ({ userId, bio, avail: rangesFrom(days, slots), isPublic: true });
     const profiles = [
       profile('u_s1', '백엔드 개발 동아리 운영진이에요. 전공 공부, 동아리, 인턴 준비까지 편하게 물어보세요!', ['월', '수', '금'], ['lunch', 'dinner']),
       profile('u_s2', '마케팅 공모전을 여러 번 나갔어요. 학교 앞 맛집은 제가 제일 잘 압니다.', ['화', '목'], ['lunch']),
@@ -239,18 +268,24 @@
   // ---------- 선배 프로필 ----------
   const getProfile = (userId) => db.profiles.find((p) => p.userId === userId) || null;
 
-  function saveProfile({ bio, days, slots, isPublic }) {
+  function saveProfile({ bio, avail, isPublic }) {
     const u = currentUser();
     if (!u) return '로그인이 필요해요.';
     if (bio.length > BIO_MAX) return `자기소개는 ${BIO_MAX}자 이내로 써 주세요.`;
     if (isPublic && !bio.trim()) return '공개하려면 자기소개를 써 주세요.';
-    if (isPublic && (!days.length || !slots.length)) return '공개하려면 가능한 요일과 시간대를 하나 이상 골라 주세요.';
+    for (const a of avail) {
+      if (!DAYS.includes(a.day)) return '요일을 다시 골라 주세요.';
+      if (!(a.start >= HOUR_MIN && a.end <= HOUR_MAX && a.end - a.start >= MIN_RANGE)) {
+        return `가능 시간은 ${HOUR_MIN}시~${HOUR_MAX}시 사이에서 ${MIN_RANGE}시간 이상으로 정해 주세요. (${a.day} ${a.start}:00~${a.end}:00)`;
+      }
+    }
+    if (isPublic && !avail.length) return '공개하려면 가능한 시간을 하나 이상 추가해 주세요.';
     let p = getProfile(u.id);
     if (!p) {
       p = { userId: u.id };
       db.profiles.push(p);
     }
-    Object.assign(p, { bio: bio.trim(), days, slots, isPublic });
+    Object.assign(p, { bio: bio.trim(), avail: mergeRanges(avail), isPublic });
     save();
     return null;
   }
@@ -307,8 +342,7 @@
     if (pendingCountFor(toId) >= MAX_PENDING_PER_SENIOR) return '이 선배는 지금 신청이 많이 밀려 있어요. 나중에 다시 시도해 주세요.';
     if (!options.length) return '희망 일시를 하나 이상 골라 주세요.';
     if (options.some((o) => o.date < today())) return '지난 날짜는 고를 수 없어요.';
-    if (options.some((o) => !p.slots.includes(o.slot))) return '선배가 가능한 시간대 중에서 골라 주세요.';
-    if (options.some((o) => !p.days.includes(weekday(o.date)))) return '선배가 가능한 요일 중에서 골라 주세요.';
+    if (options.some((o) => !windowsOn(p, weekday(o.date)).includes(o.slot))) return '선배가 가능한 시간 안에서 골라 주세요.';
     if (new Set(options.map((o) => o.date + o.slot)).size !== options.length) return '같은 일시를 두 번 고를 수 없어요.';
     if (message.length > MESSAGE_MAX) return `한마디는 ${MESSAGE_MAX}자 이내로 써 주세요.`;
     db.requests.push({
@@ -448,12 +482,12 @@
   const isEventRequest = (r) => r.status === 'accepted' && isEventOption(r.options[r.chosen]);
   const eventEntriesOf = (userId) => db.requests.filter((r) => (r.fromId === userId || r.toId === userId) && isEventRequest(r));
   const eventEntryCount = () => db.requests.filter(isEventRequest).length;
-  const supportsEvent = (profile) => profile.days.includes(EVENT.day) && profile.slots.includes(EVENT.slot);
+  const supportsEvent = (profile) => windowsOn(profile, EVENT.day).includes(EVENT.slot);
 
   load();
 
   window.Store = {
-    DAYS, SLOTS, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
