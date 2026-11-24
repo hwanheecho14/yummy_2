@@ -528,7 +528,27 @@
     }
     route();
     document.querySelector('.composer textarea')?.focus();
+    scheduleDemoReply(requestId);
     return true;
+  }
+
+  // 상대가 예시 계정이면 '입력 중…'을 잠깐 보여준 뒤 자동 답장 (데모에서 대화가 오가는 느낌을 주기 위함)
+  function scheduleDemoReply(requestId) {
+    const me = S.currentUser();
+    const r = S.requestById(requestId);
+    const other = r && S.userById(r.fromId === me.id ? r.toId : r.fromId);
+    if (!other || other.pwHash) return;
+    const box = document.getElementById('messages');
+    if (box) {
+      box.insertAdjacentHTML('beforeend', `<div class="bubble-row typing">${initial(other)}<div class="bubble">입력 중…</div></div>`);
+      scrollChatToBottom();
+    }
+    clearTimeout(scheduleDemoReply.t);
+    scheduleDemoReply.t = setTimeout(() => {
+      const m = S.demoReply(requestId);
+      if (location.hash === `#/chat/${requestId}`) route();
+      else if (m) renderNav();
+    }, 1200);
   }
 
   // 빠른 답장: 누르면 바로 보내지는 기본 문장. 상대가 마지막에 보낸 말에 맞춰 첫 줄을 바꿈
@@ -571,7 +591,7 @@
             return `<div class="bubble-row ${mine ? 'mine' : ''}">
                 ${mine ? '' : initial(other)}
                 <div class="bubble">${esc(m.text)}</div>
-                <span class="bubble-time">${msgTime(m.createdAt)}</span>
+                <span class="bubble-time">${m.auto ? '<span class="auto-tag">예시 자동 답장</span>' : ''}${msgTime(m.createdAt)}</span>
               </div>`;
           })
           .join('')
@@ -1210,9 +1230,8 @@
       const { total, people, memo } = readDutch(box);
       const text = dutchText(total, people, memo);
       if (!text) return toast('총 금액과 2명 이상 인원을 입력해 주세요.');
-      const err = S.sendMessage(box.dataset.chat, text);
-      toast(err || '엔빵 결과를 대화방에 보냈어요.');
-      return route();
+      if (sendChat(box.dataset.chat, text)) toast('엔빵 결과를 대화방에 보냈어요.');
+      return;
     }
     if (action === 'join-meetup') {
       if (!S.currentUser()) return go('#/login?next=' + encodeURIComponent('#/meetup/' + id));

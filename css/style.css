@@ -722,3 +722,5 @@ blockquote {
   white-space: nowrap;
 }
 .chip.quick:hover { border-color: var(--primary); color: var(--primary-deep); }
+.auto-tag { display: block; font-size: 0.68rem; color: var(--muted); }
+.bubble-row.typing .bubble { color: var(--muted); font-style: italic; }

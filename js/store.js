@@ -686,6 +686,33 @@
     return null;
   }
 
+  // ---------- 예시 계정 자동 답장 (데모용) ----------
+  // 상대가 예시 계정(직접 가입하지 않은 더미 사용자)이면, 내가 보낸 마지막 말에 맞춰 짧게 답장함
+  function replyText(text, other) {
+    const food = ((getProfile(other.id) || {}).foods || [])[0];
+    if (/안녕|반가|처음/.test(text)) return '안녕하세요! 반가워요 😊 연락 줘서 고마워요.';
+    if (/언제|시간|괜찮|요일/.test(text)) return '저는 신청서에 적힌 시간 다 괜찮아요! 편한 날로 골라 주세요.';
+    if (/어디|장소|메뉴|뭐 먹|먹을/.test(text)) return food ? `${food} 어때요? 학식도 좋아요!` : '학식 어때요? 다른 곳도 좋아요!';
+    if (/엔빵|원|송금/.test(text)) return '확인했어요! 바로 보낼게요 💸';
+    if (/감사|고마|땡큐/.test(text)) return '저도 고마워요! 그날 봬요 🙌';
+    if (/봬요|봐요|그때/.test(text)) return '네 그때 봬요! 😄';
+    return '좋아요! 😄';
+  }
+
+  function demoReply(requestId) {
+    const me = currentUser();
+    const r = requestById(requestId);
+    if (!me || !isParticipant(r, me.id) || !canChat(r)) return null;
+    const other = userById(r.fromId === me.id ? r.toId : r.fromId);
+    if (!other || other.pwHash) return null; // 직접 가입한 실제 사용자에게는 자동 답장 안 함
+    const last = messagesOf(requestId).pop();
+    if (!last || last.fromId !== me.id) return null;
+    const m = { id: uid('m'), requestId, fromId: other.id, text: replyText(last.text, other), createdAt: Date.now(), readBy: [other.id], auto: true };
+    db.messages.push(m);
+    save();
+    return m;
+  }
+
   function markMessagesRead(requestId, userId) {
     let changed = false;
     db.messages.forEach((m) => {
@@ -726,6 +753,6 @@
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
     notificationsOf, unreadCount, markAllRead, reset,
     EVENT, isEventOption, eventEntriesOf, eventEntryCount, supportsEvent,
-    MESSAGE_TEXT_MAX, requestById, isParticipant, canChat, messagesOf, sendMessage, markMessagesRead, unreadMessages,
+    MESSAGE_TEXT_MAX, requestById, isParticipant, canChat, messagesOf, sendMessage, demoReply, markMessagesRead, unreadMessages,
   };
 })();
