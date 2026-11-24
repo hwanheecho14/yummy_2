@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v13';
-  const DB_VERSION = 13;
+  const KEY = 'bapyak-db-v14';
+  const DB_VERSION = 14;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -244,7 +244,13 @@
     const messages = [
       msg('m_seed1', 'r_seed1', 'u_j2', '선배님 안녕하세요! 신청 보낸 한예린이에요. 혹시 시간 괜찮으실까요?', DAY_MS - 6e5),
     ];
-    return { version: DB_VERSION, users, profiles, requests, notifications, messages, reports: [], blocks: [], session: null };
+    // 밥친구 모집 예시 (번개 모집, 2:2 그룹 밥약)
+    const meetups = [
+      { id: 'mt_seed1', hostId: 'u_b1', title: '공강에 학식 같이 먹을 새내기 구해요', format: 'free', date: plusDays(1), slot: 'h12', place: '학생식당', capacity: 4, memberIds: ['u_b1', 'u_j2'], createdAt: now - 3 * 36e5 },
+      { id: 'mt_seed2', hostId: 'u_s9', title: '컴퓨터학부 선배 2 + 새내기 2, 마라탕 먹어요', format: '2v2', date: plusDays(3), slot: 'h17', place: '후문 마라탕집', capacity: 4, memberIds: ['u_s9', 'u_s6'], createdAt: now - 6 * 36e5 },
+      { id: 'mt_seed3', hostId: 'u_b2', title: '금요일 점심 새로운 맛집 탐방', format: 'free', date: plusDays(4), slot: 'h11', place: '한대앞역 근처', capacity: 3, memberIds: ['u_b2'], createdAt: now - 36e5 },
+    ];
+    return { version: DB_VERSION, users, profiles, requests, notifications, messages, meetups, reports: [], blocks: [], session: null };
   }
 
   function load() {
@@ -258,6 +264,7 @@
       save();
     }
     if (!Array.isArray(db.messages)) db.messages = []; // 대화 기능 이전에 저장된 데이터
+    if (!Array.isArray(db.meetups)) db.meetups = [];
   }
 
   // 저장에 성공하면 true. 저장 공간이 꽉 찼거나 저장할 수 없는 환경이면 false (메모리에서만 동작)
@@ -421,6 +428,69 @@
     if (!u) return;
     db.reports.push({ id: uid('rp'), reporterId: u.id, targetId, reason: reason.trim(), createdAt: Date.now() });
     save();
+  }
+
+  // ---------- 밥친구 모집 (번개 모집 · 그룹 밥약) ----------
+  // format: 'free'(자유 인원 2~6명) | '2v2' | '3v3'. 2:2는 4명, 3:3은 6명이 정원
+  const MEETUP_FORMATS = { free: '자유 모집', '2v2': '2:2 그룹 밥약', '3v3': '3:3 그룹 밥약' };
+  const meetupById = (id) => db.meetups.find((m) => m.id === id) || null;
+  const isMeetupOver = (m) => m.date < today();
+  const isMeetupFull = (m) => m.memberIds.length >= m.capacity;
+
+  function upcomingMeetups() {
+    const me = currentUser();
+    return db.meetups
+      .filter((m) => !isMeetupOver(m) && !m.cancelled && (!me || !isBlocked(me.id, m.hostId)))
+      .sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
+  }
+
+  function createMeetup({ title, format, date, slot, place, capacity }) {
+    const me = currentUser();
+    if (!me) return '로그인이 필요해요.';
+    title = title.trim();
+    place = place.trim();
+    if (!title || title.length > 40) return '제목을 40자 이내로 적어 주세요.';
+    if (!MEETUP_FORMATS[format]) return '모집 방식을 골라 주세요.';
+    if (!date || date < today()) return '오늘 이후 날짜를 골라 주세요.';
+    if (!SLOTS.some((s) => s.id === slot)) return '시간대를 골라 주세요.';
+    if (!place || place.length > 30) return '장소를 30자 이내로 적어 주세요.';
+    const cap = format === '2v2' ? 4 : format === '3v3' ? 6 : Number(capacity);
+    if (!(cap >= 2 && cap <= 6)) return '인원은 2~6명으로 정해 주세요.';
+    const m = { id: uid('mt'), hostId: me.id, title, format, date, slot, place, capacity: cap, memberIds: [me.id], createdAt: Date.now() };
+    db.meetups.push(m);
+    save();
+    return { id: m.id };
+  }
+
+  function joinMeetup(id) {
+    const me = currentUser();
+    const m = meetupById(id);
+    if (!me) return '로그인이 필요해요.';
+    if (!m || m.cancelled || isMeetupOver(m)) return '끝난 모집이에요.';
+    if (m.memberIds.includes(me.id)) return '이미 참여했어요.';
+    if (isMeetupFull(m)) return '자리가 다 찼어요.';
+    if (isBlocked(me.id, m.hostId)) return '참여할 수 없는 모집이에요.';
+    m.memberIds.push(me.id);
+    notify(m.hostId, `🍚 ${me.name}님이 '${m.title}' 모집에 참여했어요.`, `#/meetup/${m.id}`);
+    if (isMeetupFull(m)) {
+      m.memberIds.forEach((uid2) => notify(uid2, `🎉 '${m.title}' 인원이 다 모였어요! 멤버 연락처를 확인해 보세요.`, `#/meetup/${m.id}`));
+    }
+    save();
+    return null;
+  }
+
+  function leaveMeetup(id) {
+    const me = currentUser();
+    const m = meetupById(id);
+    if (!me || !m || !m.memberIds.includes(me.id)) return '참여하지 않은 모집이에요.';
+    if (m.hostId === me.id) {
+      m.cancelled = true;
+      m.memberIds.filter((x) => x !== me.id).forEach((x) => notify(x, `'${m.title}' 모집이 취소됐어요.`, '#/'));
+    } else {
+      m.memberIds = m.memberIds.filter((x) => x !== me.id);
+    }
+    save();
+    return null;
   }
 
   // ---------- 겹치는 공강 계산 ----------
@@ -650,7 +720,7 @@
   load();
 
   window.Store = {
-    myFreeTime, overlapRanges, matchWith, recommendTimes, ALLERGENS, BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
+    MEETUP_FORMATS, meetupById, isMeetupFull, upcomingMeetups, createMeetup, joinMeetup, leaveMeetup, myFreeTime, overlapRanges, matchWith, recommendTimes, ALLERGENS, BIRTH_MIN, BIRTH_MAX, KINDS, kindOf, FOODS_MAX, SPOTS_MAX, parseFoods, parseSpots, DAYS, SLOTS, HOUR_MIN, HOUR_MAX, MIN_RANGE, mergeRanges, availDays, windowsOn, hasWindow, freeRanges, TIMETABLE_START, TIMETABLE_END, COLLEGES, DEPTS, collegeOf, MAX_PENDING_PER_SENIOR, EXPIRE_DAYS, BIO_MAX, MESSAGE_MAX,
     today, userById, currentUser, signup, login, loginAs, logout, updateUser,
     getProfile, saveProfile, publicSeniors, isBlocked, block, report,
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
