@@ -1,7 +1,7 @@
 // 데이터 저장소: 모든 데이터는 브라우저 localStorage에 저장됩니다 (백엔드 없음).
 (function () {
-  const KEY = 'bapyak-db-v5';
-  const DB_VERSION = 5;
+  const KEY = 'bapyak-db-v6';
+  const DB_VERSION = 6;
   const DAY_MS = 864e5;
 
   const DAYS = ['월', '화', '수', '목', '금'];
@@ -156,7 +156,12 @@
       { id: 'n_seed1', userId: 'u_s1', text: '한예린님이 밥약을 신청했어요.', link: '#/my?tab=received', read: false, createdAt: now - DAY_MS },
       { id: 'n_seed2', userId: 'u_j1', text: '이서연님이 밥약을 수락했어요. 연락처를 확인해 보세요.', link: '#/my?tab=sent', read: false, createdAt: now - DAY_MS },
     ];
-    return { version: DB_VERSION, users, profiles, requests, notifications, reports: [], blocks: [], session: null };
+    // 신청마다 주고받는 대화 (선배 체험 계정이 받은 신청에 예시 대화)
+    const msg = (id, requestId, fromId, text, ago) => ({ id, requestId, fromId, text, createdAt: now - ago, readBy: [fromId] });
+    const messages = [
+      msg('m_seed1', 'r_seed1', 'u_j2', '선배님 안녕하세요! 신청 보낸 한예린이에요. 혹시 시간 괜찮으실까요?', DAY_MS - 6e5),
+    ];
+    return { version: DB_VERSION, users, profiles, requests, notifications, messages, reports: [], blocks: [], session: null };
   }
 
   function load() {
@@ -169,6 +174,7 @@
       db = seed();
       save();
     }
+    if (!Array.isArray(db.messages)) db.messages = []; // 대화 기능 이전에 저장된 데이터
   }
 
   function save() {
@@ -383,6 +389,56 @@
     save();
   }
 
+  // ---------- 신청별 대화 ----------
+  // 신청이 대기 중이거나 수락된 동안 두 사람이 사이트 안에서 메시지를 주고받을 수 있습니다.
+  const MESSAGE_TEXT_MAX = 300;
+  const requestById = (id) => db.requests.find((r) => r.id === id) || null;
+  const isParticipant = (r, userId) => !!r && (r.fromId === userId || r.toId === userId);
+  const canChat = (r) => !!r && (r.status === 'pending' || r.status === 'accepted') && !isBlocked(r.fromId, r.toId);
+
+  function messagesOf(requestId) {
+    return db.messages.filter((m) => m.requestId === requestId).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  function sendMessage(requestId, text) {
+    const me = currentUser();
+    const r = requestById(requestId);
+    if (!me || !isParticipant(r, me.id)) return '대화할 수 없는 신청이에요.';
+    if (!canChat(r)) return '끝난 신청이라 더 이상 메시지를 보낼 수 없어요.';
+    text = text.trim();
+    if (!text) return '메시지를 입력해 주세요.';
+    if (text.length > MESSAGE_TEXT_MAX) return `메시지는 ${MESSAGE_TEXT_MAX}자 이내로 써 주세요.`;
+    db.messages.push({ id: uid('m'), requestId, fromId: me.id, text, createdAt: Date.now(), readBy: [me.id] });
+    const otherId = r.fromId === me.id ? r.toId : r.fromId;
+    // 같은 신청에 아직 안 읽은 메시지 알림이 있으면 알림을 또 만들지 않음
+    const link = `#/chat/${requestId}`;
+    if (!db.notifications.some((n) => n.userId === otherId && n.link === link && !n.read)) {
+      notify(otherId, `💬 ${me.name}님이 메시지를 보냈어요.`, link);
+    }
+    save();
+    return null;
+  }
+
+  function markMessagesRead(requestId, userId) {
+    let changed = false;
+    db.messages.forEach((m) => {
+      if (m.requestId === requestId && !m.readBy.includes(userId)) {
+        m.readBy.push(userId);
+        changed = true;
+      }
+    });
+    db.notifications.forEach((n) => {
+      if (n.userId === userId && n.link === `#/chat/${requestId}` && !n.read) {
+        n.read = true;
+        changed = true;
+      }
+    });
+    if (changed) save();
+  }
+
+  const unreadMessages = (requestId, userId) =>
+    db.messages.filter((m) => m.requestId === requestId && !m.readBy.includes(userId)).length;
+
   // ---------- 수요일 공강 커피 이벤트 ----------
   // 매주 수요일 13:00~15:00은 학교 전체 공강 시간. 이 시간으로 밥약이 확정되면 두 사람 모두 커피 기프티콘 추첨에 응모됩니다.
   const EVENT = { day: '수', slot: 'h13', label: '수요일 13:00~15:00' };
@@ -403,5 +459,6 @@
     activeRequest, pendingCountFor, createRequest, respond, cancel, expireOld, requestsOf,
     notificationsOf, unreadCount, markAllRead, reset,
     EVENT, isEventOption, eventEntriesOf, eventEntryCount, supportsEvent,
+    MESSAGE_TEXT_MAX, requestById, isParticipant, canChat, messagesOf, sendMessage, markMessagesRead, unreadMessages,
   };
 })();
