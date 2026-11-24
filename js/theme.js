@@ -18,10 +18,15 @@
     }
   }
 
+  // 사이트를 감싼 화면(예: 공유 링크 뷰어)이 미리 정해 둔 테마가 있으면 '기기 설정' 모드에서는 그것을 따름
+  const hostTheme = document.documentElement.getAttribute('data-theme');
+
   function apply(mode) {
     const root = document.documentElement;
-    if (mode === 'system') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', mode);
+    if (mode === 'system') {
+      if (hostTheme) root.setAttribute('data-theme', hostTheme);
+      else root.removeAttribute('data-theme');
+    } else root.setAttribute('data-theme', mode);
     const btn = document.getElementById('theme-toggle');
     if (btn) {
       btn.textContent = MODES[mode].icon;
